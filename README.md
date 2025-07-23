@@ -10,6 +10,15 @@ This is a CLI for interacting with language models and image models. To get star
 
 When in doubt which `.gguf` to download, take your GPU's VRAM and use the file size as a guideline. It's recommended to have a minimum of **16GB RAM** and **6GB VRAM**.
 
+A model is considered multimodal if it follows this file structure:
+
+```
+gemma_3-4b.gguf
+gemma_3-4b-mmproj.gguf
+```
+
+Thus, if you download a multimodal projector for a model, you may need to rename it.
+
 ## Text-Only Models
 
 - [Qwen3 0.6B](https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/tree/main)
