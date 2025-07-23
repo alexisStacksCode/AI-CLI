@@ -34,7 +34,7 @@ Thus, if you download a multimodal projector for a model, you may need to rename
 - [Qwen2-Audio 7B](https://huggingface.co/mradermacher/Qwen2-Audio-7B-Instruct-GGUF/tree/main)
     - Make sure to download both the model and multimodal projector (f16/Q8_0).
 - [Gemma 3 4B](https://huggingface.co/unsloth/gemma-3-4b-it-qat-GGUF/tree/main)
-    - Get the multimodal projector from: https://huggingface.co/koboldcpp/mmproj/tree/main
+    - Make sure to download the multimodal projector (f32/f16/bf16).
 - [Tiger Gemma 12B v3](https://huggingface.co/TheDrummer/Tiger-Gemma-12B-v3-GGUF/tree/main)
     - Less censored version of **Gemma 3 12B**.
     - Get the multimodal projector from: https://huggingface.co/koboldcpp/mmproj/tree/main
