@@ -1,0 +1,4 @@
+.idea/
+*.gguf
+*.safetensors
+settings.json
