@@ -295,6 +295,12 @@ if __name__ == "__main__":
     ]
     IMAGE_MODEL_SERVER_FILENAME: str = "koboldcpp.exe"
     IMAGE_MODEL_OUTPUT_DIR_NAME: str = "image_outputs/"
+    IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS: list[str] = [
+        "none",
+        "cuda",
+        "clblast",
+        "vulkan",
+    ]
     IMAGE_MODEL_EXTENSIONS: list[str] = [
         ".safetensors",
         ".gguf",
@@ -347,7 +353,7 @@ if __name__ == "__main__":
         "enable_image_model_server_in_chat": False,
         "image_model_init_settings": {
             "server_port": 5001,
-            "use_gpu": True,
+            "hardware_acceleration": "cuda",
             "quantize_safetensors_on_server_start": False,
             "use_vae_tiling": True,
         },
@@ -584,6 +590,10 @@ if __name__ == "__main__":
             script_settings["text_model_gen_settings"]["xtc_threshold"] = clamp_float(script_settings["text_model_gen_settings"]["xtc_threshold"], 0.0, 1.0)
             script_settings["text_model_gen_settings"]["autocomplete_max_tokens"] = max(script_settings["text_model_gen_settings"]["autocomplete_max_tokens"], 16)
 
+            # Validate image_model_init_settings.
+            if script_settings["image_model_init_settings"]["hardware_acceleration"] not in IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS:
+                script_settings["image_model_init_settings"]["hardware_acceleration"] = IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[1]
+
             # TODO: Implement image_model_gen_settings validation.
     with open(SCRIPT_SETTINGS_PATH, "wt") as file:
         json.dump(script_settings, file, indent=4)
@@ -713,7 +723,10 @@ if __name__ == "__main__":
             arguments: list[str] = [
                 "--skiplauncher",
                 f"--port {script_settings["image_model_init_settings"]["server_port"]}",
-                "--usecublas" if script_settings["image_model_init_settings"]["use_gpu"] else "",
+                "--usecpu" if script_settings["image_model_init_settings"]["hardware_acceleration"] == IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[0] else "",
+                "--usecublas" if script_settings["image_model_init_settings"]["hardware_acceleration"] == IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[1] else "",
+                "--useclblast 0 0" if script_settings["image_model_init_settings"]["hardware_acceleration"] == IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[2] else "",
+                "--usevulkan" if script_settings["image_model_init_settings"]["hardware_acceleration"] == IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[3] else "",
                 "--nomodel",
                 f"--sdmodel \"{image_model_path}\"",
                 f"--sdlora \"{image_model_lora_path}\"" if image_model_lora_path != "" else "",
