@@ -940,12 +940,12 @@ if __name__ == "__main__":
                             case _:
                                 print("An error occurred.\n")
                 else:
-                    printed_prompt: bool = False
+                    was_prompt_printed: bool = False
                     for line in text_response.iter_lines():
                         decoded_line: str = line.decode("utf-8")
                         if decoded_line.startswith("data: "):
-                            if not printed_prompt:
-                                printed_prompt = True
+                            if not was_prompt_printed:
+                                was_prompt_printed = True
                                 print(prompt, end="")
                             print(json.loads(line[len("data: "):])["content"], end="", flush=True)
                         elif decoded_line.startswith("error: "):
