@@ -143,6 +143,8 @@ To quantize image models, you'll need **[stable-diffusion.cpp](https://github.co
     - **Values:** `true`, `false`
 - `text_model_gen_settings`: These settings apply to language model text generation. If you change any of these settings at runtime, you must restart the script.
   - `stream_responses`: Allows receiving each predicted token in real-time.
+    - **Type:** `bool`
+    - **Values:** `true`, `false`
   - `temperature`: Adjust the randomness of the generated text.
     - **Type:** `float`
     - **Min. Value:** `0.0`
@@ -169,8 +171,8 @@ To quantize image models, you'll need **[stable-diffusion.cpp](https://github.co
     - **Max. Value:** `2.0`
   - `repetition_penalty_range`: Amount of recent tokens to consider for penalizing repetition. If `0`, this is disabled. If `1`, this will extend to the available context size.
     - **Type:** `int`
-    - **Min. Value:** -1
-    - **Max. Value:** 8192
+    - **Min. Value:** `-1`
+    - **Max. Value:** `8192`
   - `presence_penalty`: Repeat alpha presence penalty.
     - **Type:** `float`
     - **Min. Value:** `-2.0`
@@ -207,8 +209,8 @@ To quantize image models, you'll need **[stable-diffusion.cpp](https://github.co
     - **Values:** `true`, `false`
   - `autocomplete_max_tokens`: Amount of tokens to generate in Autocomplete Mode.
     - **Type:** `int`
-    - **Min. Value:** 16
-    - **Max. Value:** 1024
+    - **Min. Value:** `16`
+    - **Max. Value:** `1024`
 - `enable_image_model_server_in_chat`: Enables image generation capabilities in Chat Mode. This doesn't modify the system prompt, but rather it allows usage of the command `/image`.
   - **Type:** `bool`
   - **Values:** `true`, `false`
@@ -236,7 +238,7 @@ Chat with the AI. You can send files (text files, images, audio) in the chat; th
 
 Generated images are saved to the `image_outputs` folder. Provided that the LM is vision-enabled, they can also be part of the context.
 
-Usage example:
+**Usage Example:**
 
 ~~~
 USER: What is the capital of France?
@@ -272,7 +274,7 @@ USER:
 
 Input a prompt and the AI will complete it.
 
-Usage example:
+**Usage Example:**
 
 ```
 > Hello
