@@ -828,7 +828,7 @@ if __name__ == "__main__":
                         if append_message(TEXT_MODEL_CHAT_ROLES[2], model_message, image_output_path):
                             print(f"\nMODEL: {model_message}\n")
                     else:
-                        print(f"\nMODEL: {model_message} This message won't be added to the context as vision is not enabled for '{text_model_id}'.\n")
+                        print(f"\nMODEL: {model_message} This message won't be added to the context as I cannot see images.\n")
                 except requests.exceptions.ConnectionError:
                     image_model_server_active = False
                     print("Image model server was closed")
