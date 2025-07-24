@@ -132,7 +132,7 @@ To quantize image models, you'll need **[stable-diffusion.cpp](https://github.co
   - `cache_reuse_size`: Refer to https://ggml.ai/f0.png.
     - **Type:** `int`
     - **Min. Value:** `0`
-  - `use_context_shift`: Enables Context Shift. Note that **llama.cpp** automatically disables Context Shift for some models (e.g., **Gemma 3**).
+  - `use_context_shift`: Enable Context Shift. Note that **llama.cpp** automatically disables Context Shift for some models (e.g., **Gemma 3**).
     - **Type:** `bool`
     - **Values:** `true`, `false`
   - `context_size`: Maximum amount of tokens the text model can handle.
