@@ -869,12 +869,11 @@ if __name__ == "__main__":
                                     text_model_message_history.pop()
                                     break
                                 elif decoded_line.startswith("{\"error\":"):
-                                    # Since chat_response.json() does not work here, we check for the existence of
-                                    # specific strings in the decoded line.
-                                    if "Failed to load image or audio file" in decoded_line:
-                                        print("Cannot read malformed file.", end="")
-                                    else:
-                                        print("An error occurred.", end="")
+                                    match json.loads(decoded_line)["error"]["message"]:
+                                        case "Failed to load image or audio file":
+                                            print("Cannot read malformed file.", end="")
+                                        case _:
+                                            print("An error occurred.", end="")
                                     print(" This message won't be added to the context.", end="")
                                     text_model_message_history.pop()
                             if model_message_buffer != "":
