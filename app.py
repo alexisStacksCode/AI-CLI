@@ -936,7 +936,7 @@ if __name__ == "__main__":
                     else:
                         match text_response_data["error"]["message"]:
                             case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                print("Your prompt exceeds the available context size. Try increasing context size or enable Context Shift.\n")
+                                print("Your prompt exceeds the available context size. Try increasing the context size or enable Context Shift.\n")
                             case _:
                                 print("An error occurred.\n")
                 else:
@@ -951,7 +951,7 @@ if __name__ == "__main__":
                         elif decoded_line.startswith("error: "):
                             match json.loads(line[len("error: "):])["message"]:
                                 case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                    print("Your prompt exceeds the available context size. Try increasing context size or enable Context Shift.", end="")
+                                    print("Your prompt exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
                                 case _:
                                     print("An error occurred.", end="")
                             break
