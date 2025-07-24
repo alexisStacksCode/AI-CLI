@@ -840,38 +840,45 @@ if __name__ == "__main__":
                             else:
                                 match chat_response_data["error"]["message"]:
                                     case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                        print("\nMODEL: Your message exceeds the available context size. Try increasing the context size or enable Context Shift. This message won't be added to the context.\n")
+                                        print("\nMODEL: Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
                                     case "Failed to load image or audio file":
-                                        print(f"\nMODEL: Got malformed file. This message won't be added to the context.\n")
+                                        print("\nMODEL: Cannot read malformed file.", end="")
+                                    case _:
+                                        print("\nMODEL: An error occurred.", end="")
+                                print(" This message won't be added to the context.\n")
                                 text_model_message_history.pop()
                         else:
                             model_message_buffer: str = ""
 
+                            # Streaming code based on: https://gist.github.com/ggorlen/7c944d73e27980544e29aa6de1f2ac54
                             print("\nMODEL: ", end="")
-                            try:
-                                # NOTE: chat_response.json() is used to check for certain kinds of errors.
-                                match chat_response.json()["error"]["message"]:
-                                    case "Failed to load image or audio file":
-                                        print(f"Got malformed file. This message won't be added to the context.", end="")
-                                text_model_message_history.pop()
-                            except json.JSONDecodeError:
-                                # Streaming code based on: https://gist.github.com/ggorlen/7c944d73e27980544e29aa6de1f2ac54
-                                for line in chat_response.iter_lines():
-                                    decoded_line: str = line.decode("utf-8")
-                                    if decoded_line.startswith("data: ") and not decoded_line.endswith("[DONE]"):
-                                        chunk: str | None = json.loads(line[len("data: "):])["choices"][0]["delta"].get("content", "")
-                                        if chunk is not None:
-                                            model_message_buffer += chunk
-                                            print(chunk, end="", flush=True)
-                                    elif decoded_line.startswith("error: "):
-                                        match json.loads(line[len("error: "):])["message"]:
-                                            case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                                print("Your message exceeds the available context size. Try increasing the context size or enable Context Shift. This message won't be added to the context.", end="")
-                                        text_model_message_history.pop()
-                                        break
-
-                                if model_message_buffer != "":
-                                    append_message(TEXT_MODEL_CHAT_ROLES[2], strip_thoughts(model_message_buffer))
+                            for line in chat_response.iter_lines():
+                                decoded_line: str = line.decode("utf-8")
+                                if decoded_line.startswith("data: ") and not decoded_line.endswith("[DONE]"):
+                                    chunk: str | None = json.loads(line[len("data: "):])["choices"][0]["delta"].get("content", "")
+                                    if chunk is not None:
+                                        model_message_buffer += chunk
+                                        print(chunk, end="", flush=True)
+                                elif decoded_line.startswith("error: "):
+                                    match json.loads(line[len("error: "):])["message"]:
+                                        case "the request exceeds the available context size. try increasing the context size or enable context shift":
+                                            print("Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
+                                        case _:
+                                            print("An error occurred.", end="")
+                                    print(" This message won't be added to the context.", end="")
+                                    text_model_message_history.pop()
+                                    break
+                                elif decoded_line.startswith("{\"error\":"):
+                                    # Since chat_response.json() does not work here, we check for the existence of
+                                    # specific strings in the decoded line.
+                                    if "Failed to load image or audio file" in decoded_line:
+                                        print("Cannot read malformed file.", end="")
+                                    else:
+                                        print("An error occurred.", end="")
+                                    print(" This message won't be added to the context.", end="")
+                                    text_model_message_history.pop()
+                            if model_message_buffer != "":
+                                append_message(TEXT_MODEL_CHAT_ROLES[2], strip_thoughts(model_message_buffer))
                             print("\n")
                     except requests.exceptions.ConnectionError:
                         print("Text model server was closed")
@@ -899,6 +906,8 @@ if __name__ == "__main__":
                         match text_response_data["error"]["message"]:
                             case "the request exceeds the available context size. try increasing the context size or enable context shift":
                                 print("Your prompt exceeds the available context size. Try increasing context size or enable Context Shift.\n")
+                            case _:
+                                print("An error occurred.\n")
                 else:
                     printed_prompt: bool = False
                     for line in text_response.iter_lines():
@@ -912,6 +921,8 @@ if __name__ == "__main__":
                             match json.loads(line[len("error: "):])["message"]:
                                 case "the request exceeds the available context size. try increasing the context size or enable context shift":
                                     print("Your prompt exceeds the available context size. Try increasing context size or enable Context Shift.", end="")
+                                case _:
+                                    print("An error occurred.", end="")
                             break
                     print("\n")
             except requests.exceptions.ConnectionError:
