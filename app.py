@@ -1,6 +1,7 @@
 import os
 import base64
 import json
+import re
 import time
 import datetime
 import requests
@@ -347,6 +348,7 @@ if __name__ == "__main__":
             "dry_allowed_length": 2,
             "xtc_probability": 0.0,
             "xtc_threshold": 0.1,
+            "chat_show_thoughts_in_nonstreaming_mode": True,
             "chat_include_thoughts_in_history": False,
             "autocomplete_max_tokens": 128,
         },
@@ -515,7 +517,13 @@ if __name__ == "__main__":
         }
 
     def strip_thoughts(text: str) -> str:
-        return text.split("</think>\n\n", 1)[1] if script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"] and "<think>" in text and "</think>" in text else text
+        if script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"] or ("<think>" not in text and "</think>" not in text):
+            return text
+
+        text_buffer: str = ""
+        for pattern_match in re.findall("(<think>.*?</think>\n*)(.*?)(?=<think>|$)", text, re.DOTALL):
+            text_buffer += pattern_match[1]
+        return text_buffer
 
     def strip_leading_and_trailing_quotes(text: str) -> str:
         return text.removeprefix("\"").removesuffix("\"")
@@ -853,8 +861,9 @@ if __name__ == "__main__":
                             chat_response_data: dict = chat_response.json()
                             if "error" not in chat_response_data:
                                 model_message: str = chat_response_data["choices"][0]["message"]["content"]
-                                if append_message(TEXT_MODEL_CHAT_ROLES[2], strip_thoughts(model_message)):
-                                    print(f"\nMODEL: {model_message}\n")
+                                refined_model_message: str = strip_thoughts(model_message)
+                                if append_message(TEXT_MODEL_CHAT_ROLES[2], refined_model_message):
+                                    print(f"\nMODEL: {model_message if script_settings["text_model_gen_settings"]["chat_show_thoughts_in_nonstreaming_mode"] else refined_model_message}\n")
                             else:
                                 match chat_response_data["error"]["message"]:
                                     case "the request exceeds the available context size. try increasing the context size or enable context shift":
