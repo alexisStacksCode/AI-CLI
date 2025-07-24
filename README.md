@@ -9,6 +9,8 @@ The `text_models` and `image_models` folders are only for organization, the CLI 
 - Install **[Python 3.13](https://www.python.org/downloads/)**
 - Download **[llama.cpp](https://github.com/ggml-org/llama.cpp/releases/latest)**
 - Optionally, to use image generation, download **[KoboldCpp](https://github.com/LostRuins/koboldcpp/releases/latest)** (if using AMD, get it from [here](https://github.com/YellowRoseCx/koboldcpp-rocm))
+- Download the application and extract the folder
+- Open the folder in **Terminal** and run `pip install -r requirements.txt`
 
 ## Usage
 
