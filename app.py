@@ -314,7 +314,7 @@ if __name__ == "__main__":
     COMMAND_EXIT_ALIAS: str = "/exit"
 
     script_settings: dict = {
-        "script_mode": "chat", # Valid values: "chat", "autocomplete"
+        "script_mode": "chat",
         "text_model_init_settings": {
             "server_port": 8080,
             "priority": 0,
@@ -516,8 +516,8 @@ if __name__ == "__main__":
             "xtc_threshold": script_settings["text_model_gen_settings"]["xtc_threshold"],
         }
 
-    def strip_thoughts(text: str) -> str:
-        if script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"] or ("<think>" not in text and "</think>" not in text):
+    def process_text(text: str, return_with_thoughts: bool) -> str:
+        if return_with_thoughts or ("<think>" not in text and "</think>" not in text):
             return text
 
         text_buffer: str = ""
@@ -614,7 +614,7 @@ if __name__ == "__main__":
             script_settings["text_model_gen_settings"]["dry_allowed_length"] = clamp_int(script_settings["text_model_gen_settings"]["dry_allowed_length"], 0, 100)
             script_settings["text_model_gen_settings"]["xtc_probability"] = clamp_float(script_settings["text_model_gen_settings"]["xtc_probability"], 0.0, 1.0)
             script_settings["text_model_gen_settings"]["xtc_threshold"] = clamp_float(script_settings["text_model_gen_settings"]["xtc_threshold"], 0.0, 1.0)
-            script_settings["text_model_gen_settings"]["autocomplete_max_tokens"] = max(script_settings["text_model_gen_settings"]["autocomplete_max_tokens"], 16)
+            script_settings["text_model_gen_settings"]["autocomplete_max_tokens"] = clamp_int(script_settings["text_model_gen_settings"]["autocomplete_max_tokens"], 16, 1024)
 
             # Validate image_model_init_settings.
             script_settings["image_model_init_settings"]["server_port"] = clamp_int(script_settings["image_model_init_settings"]["server_port"], 1000, 9999)
@@ -859,19 +859,20 @@ if __name__ == "__main__":
                         chat_response: requests.Response = requests.post(f"{text_model_server_url}/v1/chat/completions", json=payload, stream=script_settings["text_model_gen_settings"]["stream_responses"])
                         if not script_settings["text_model_gen_settings"]["stream_responses"]:
                             chat_response_data: dict = chat_response.json()
+
+                            print("\nMODEL: ", end="")
                             if "error" not in chat_response_data:
                                 model_message: str = chat_response_data["choices"][0]["message"]["content"]
-                                refined_model_message: str = strip_thoughts(model_message)
-                                if append_message(TEXT_MODEL_CHAT_ROLES[2], refined_model_message):
-                                    print(f"\nMODEL: {model_message if script_settings["text_model_gen_settings"]["chat_show_thoughts_in_nonstreaming_mode"] else refined_model_message}\n")
+                                if append_message(TEXT_MODEL_CHAT_ROLES[2], process_text(model_message, script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"])):
+                                    print(f"{process_text(model_message, script_settings["text_model_gen_settings"]["chat_show_thoughts_in_nonstreaming_mode"])}\n")
                             else:
                                 match chat_response_data["error"]["message"]:
                                     case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                        print("\nMODEL: Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
+                                        print("Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
                                     case "Failed to load image or audio file":
-                                        print("\nMODEL: This file is not encodable.", end="")
+                                        print("This file is not encodable.", end="")
                                     case _:
-                                        print("\nMODEL: An error occurred.", end="")
+                                        print("An error occurred.", end="")
                                 print(" This message won't be added to the context.\n")
                                 text_model_message_history.pop()
                         else:
@@ -903,8 +904,9 @@ if __name__ == "__main__":
                                             print("An error occurred.", end="")
                                     print(" This message won't be added to the context.", end="")
                                     text_model_message_history.pop()
+                                    break
                             if model_message_buffer != "":
-                                append_message(TEXT_MODEL_CHAT_ROLES[2], strip_thoughts(model_message_buffer))
+                                append_message(TEXT_MODEL_CHAT_ROLES[2], process_text(model_message_buffer, script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"]))
                             print("\n")
                     except requests.exceptions.ConnectionError:
                         print("Text model server was closed")
