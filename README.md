@@ -272,7 +272,7 @@ USER:
 
 ## Autocomplete Mode
 
-Input a prompt and the AI will complete it.
+Input a prompt and the AI will continue it. Context is not maintained in this mode.
 
 **Usage Example:**
 
