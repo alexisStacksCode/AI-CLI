@@ -54,7 +54,7 @@ To quantize image models, you'll need **[stable-diffusion.cpp](https://github.co
 
 # Documentation
 
-## Commands
+## Chat Mode Commands
 
 - `/image`: Generate an image (requires the image model server to be online).
 - `/attach`: Attach a file or image URL to your message (command must be at the end of your message).
