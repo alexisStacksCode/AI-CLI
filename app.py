@@ -496,6 +496,24 @@ if __name__ == "__main__":
                 return True
         return False
 
+    def construct_text_model_gen_parameters() -> dict:
+        return {
+            "temperature": script_settings["text_model_gen_settings"]["temperature"],
+            "top_k": script_settings["text_model_gen_settings"]["top_k"],
+            "top_p": script_settings["text_model_gen_settings"]["top_p"],
+            "min_p": script_settings["text_model_gen_settings"]["min_p"],
+            "typical_p": script_settings["text_model_gen_settings"]["typical_p"],
+            "repeat_penalty": script_settings["text_model_gen_settings"]["repetition_penalty"],
+            "repeat_last_n": script_settings["text_model_gen_settings"]["repetition_penalty_range"],
+            "presence_penalty": script_settings["text_model_gen_settings"]["presence_penalty"],
+            "frequency_penalty": script_settings["text_model_gen_settings"]["frequency_penalty"],
+            "dry_base": script_settings["text_model_gen_settings"]["dry_base"],
+            "dry_multiplier": script_settings["text_model_gen_settings"]["dry_multiplier"],
+            "dry_allowed_length": script_settings["text_model_gen_settings"]["dry_allowed_length"],
+            "xtc_probability": script_settings["text_model_gen_settings"]["xtc_probability"],
+            "xtc_threshold": script_settings["text_model_gen_settings"]["xtc_threshold"],
+        }
+
     def strip_thoughts(text: str) -> str:
         return text.split("</think>\n\n", 1)[1] if script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"] and "<think>" in text and "</think>" in text else text
 
@@ -826,10 +844,10 @@ if __name__ == "__main__":
                             "model": text_model_id,
                             "messages": text_model_message_history,
                             "stream": script_settings["text_model_gen_settings"]["stream_responses"],
-                            "temperature": script_settings["text_model_gen_settings"]["temperature"],
-                            "presence_penalty": script_settings["text_model_gen_settings"]["presence_penalty"],
-                            "frequency_penalty": script_settings["text_model_gen_settings"]["frequency_penalty"],
                         }
+                        for key, value in construct_text_model_gen_parameters().items():
+                            payload[key] = value
+
                         chat_response: requests.Response = requests.post(f"{text_model_server_url}/v1/chat/completions", json=payload, stream=script_settings["text_model_gen_settings"]["stream_responses"])
                         if not script_settings["text_model_gen_settings"]["stream_responses"]:
                             chat_response_data: dict = chat_response.json()
@@ -891,11 +909,14 @@ if __name__ == "__main__":
             prompt: str = input("> ")
             try:
                 payload: dict = {
-                    "prompt": prompt,
-                    "n_predict": script_settings["text_model_gen_settings"]["autocomplete_max_tokens"],
-                    "stream": script_settings["text_model_gen_settings"]["stream_responses"],
                     "model": text_model_id,
+                    "prompt": prompt,
+                    "stream": script_settings["text_model_gen_settings"]["stream_responses"],
+                    "n_predict": script_settings["text_model_gen_settings"]["autocomplete_max_tokens"],
                 }
+                for key, value in construct_text_model_gen_parameters().items():
+                    payload[key] = value
+
                 text_response: requests.Response = requests.post(f"{text_model_server_url}/completion", json=payload, stream=script_settings["text_model_gen_settings"]["stream_responses"])
                 if not script_settings["text_model_gen_settings"]["stream_responses"]:
                     text_response_data: dict = text_response.json()
