@@ -1,4 +1,9 @@
-.idea/
+# Application settings
+settings.json
+
+# Models
 *.gguf
 *.safetensors
-settings.json
+
+# Pycharm
+.idea/
