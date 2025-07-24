@@ -869,7 +869,7 @@ if __name__ == "__main__":
                                     case "the request exceeds the available context size. try increasing the context size or enable context shift":
                                         print("\nMODEL: Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
                                     case "Failed to load image or audio file":
-                                        print("\nMODEL: Cannot read malformed file.", end="")
+                                        print("\nMODEL: This file is not encodable.", end="")
                                     case _:
                                         print("\nMODEL: An error occurred.", end="")
                                 print(" This message won't be added to the context.\n")
@@ -898,7 +898,7 @@ if __name__ == "__main__":
                                 elif decoded_line.startswith("{\"error\":"):
                                     match json.loads(decoded_line)["error"]["message"]:
                                         case "Failed to load image or audio file":
-                                            print("Cannot read malformed file.", end="")
+                                            print("This file is not encodable.", end="")
                                         case _:
                                             print("An error occurred.", end="")
                                     print(" This message won't be added to the context.", end="")
