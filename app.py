@@ -561,7 +561,7 @@ if __name__ == "__main__":
                 script_settings["script_mode"] = SCRIPT_MODES[0]
 
             # Validate text_model_init_settings.
-            script_settings["text_model_init_settings"]["server_port"] = max(script_settings["text_model_init_settings"]["server_port"], 0)
+            script_settings["text_model_init_settings"]["server_port"] = clamp_int(script_settings["text_model_init_settings"]["server_port"], 1000, 9999)
             script_settings["text_model_init_settings"]["priority"] = clamp_int(script_settings["text_model_init_settings"]["priority"], 0, 3)
             script_settings["text_model_init_settings"]["gpu_layers"] = max(script_settings["text_model_init_settings"]["gpu_layers"], 0)
             script_settings["text_model_init_settings"]["logical_max_batch_size"] = max(script_settings["text_model_init_settings"]["logical_max_batch_size"], 16)
@@ -591,10 +591,17 @@ if __name__ == "__main__":
             script_settings["text_model_gen_settings"]["autocomplete_max_tokens"] = max(script_settings["text_model_gen_settings"]["autocomplete_max_tokens"], 16)
 
             # Validate image_model_init_settings.
+            script_settings["image_model_init_settings"]["server_port"] = clamp_int(script_settings["image_model_init_settings"]["server_port"], 1000, 9999)
             if script_settings["image_model_init_settings"]["hardware_acceleration"] not in IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS:
                 script_settings["image_model_init_settings"]["hardware_acceleration"] = IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[1]
 
             # TODO: Implement image_model_gen_settings validation.
+
+            # Validate server ports.
+            if script_settings["text_model_init_settings"]["server_port"] == script_settings["image_model_init_settings"]["server_port"]:
+                script_settings["text_model_init_settings"]["server_port"] = 8080
+            if script_settings["image_model_init_settings"]["server_port"] == script_settings["text_model_init_settings"]["server_port"]:
+                script_settings["image_model_init_settings"]["server_port"] = 5001
     with open(SCRIPT_SETTINGS_PATH, "wt") as file:
         json.dump(script_settings, file, indent=4)
 
