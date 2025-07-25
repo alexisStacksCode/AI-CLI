@@ -398,17 +398,18 @@ if __name__ == "__main__":
         file_path_length: int = len(_file_path)
         filename: str = os.path.basename(_file_path)
         file_extension: str = get_path_extension(_file_path, False)
-        is_file_url: bool = validators.url(_file_path)
         does_file_exist: bool = os.path.exists(_file_path)
+        is_file_valid_url: bool = validators.url(_file_path)
+        is_file_generic_url: bool = is_generic_url(_file_path)
 
-        if script_settings["disable_url_attachments"] and role == TEXT_MODEL_CHAT_ROLES[1] and is_file_url:
+        if script_settings["disable_url_attachments"] and role == TEXT_MODEL_CHAT_ROLES[1] and is_file_valid_url:
             print("URL attachments are disabled")
             return append_message(role, message)
 
-        if (is_file_url and is_generic_url(_file_path)) or filename in TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES or file_extension in TEXT_MODEL_ATTACHMENT_GENERIC_EXTENSIONS:
-            if not is_file_url:
+        if (is_file_valid_url and is_file_generic_url) or filename in TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES or file_extension in TEXT_MODEL_ATTACHMENT_GENERIC_EXTENSIONS:
+            if not is_file_generic_url:
                 if not does_file_exist:
-                    print("File does not exist")
+                    print("File not found")
                     return append_message(role, message)
 
                 try:
@@ -436,8 +437,8 @@ if __name__ == "__main__":
                     return append_message(role, message)
             return True
         elif file_extension in TEXT_MODEL_ATTACHMENT_IMAGE_EXTENSIONS:
-            if not is_file_url and not does_file_exist:
-                print("File does not exist")
+            if not is_file_valid_url and not does_file_exist:
+                print("File not found")
                 return append_message(role, message)
 
             if not text_model_modalities["vision"]:
@@ -454,7 +455,7 @@ if __name__ == "__main__":
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": _file_path if is_file_url else get_image_data(_file_path),
+                            "url": get_image_data(_file_path) if not is_file_valid_url else _file_path,
                         },
                     },
                 ]
@@ -462,7 +463,7 @@ if __name__ == "__main__":
             return True
         elif file_extension in TEXT_MODEL_ATTACHMENT_AUDIO_EXTENSIONS:
             if not does_file_exist:
-                print("File does not exist")
+                print("File not found")
                 return append_message(role, message)
 
             if not text_model_modalities["audio"]:
