@@ -2,6 +2,7 @@ import os
 import base64
 import json
 import re
+import colorama
 import time
 import datetime
 import requests
@@ -13,6 +14,14 @@ if __name__ == "__main__":
         "chat",
         "autocomplete",
     ]
+    PRINT_COLORS: dict[str, str] = {
+        "success": colorama.Fore.LIGHTGREEN_EX,
+        "warning": colorama.Fore.LIGHTYELLOW_EX,
+        "error": colorama.Fore.LIGHTRED_EX,
+        "user_prefix": colorama.Fore.LIGHTBLUE_EX,
+        "model_prefix": colorama.Fore.LIGHTMAGENTA_EX,
+        "special": colorama.Fore.LIGHTCYAN_EX,
+    }
     SERVER_CHECK_INTERVAL: float = 1.0
     TEXT_MODEL_SERVER_FILENAME: str = "llama-server.exe"
     TEXT_MODEL_CHAT_SYSTEM_PROMPT_PATH: str = "chat_system_prompt.txt"
@@ -389,9 +398,12 @@ if __name__ == "__main__":
     image_model_server_url: str = "http://localhost:"
     image_model_server_active: bool = False
 
+    def new_print(string: str, string_color: str, end: str="\n") -> None:
+        print(f"{string_color}{string}{colorama.Style.RESET_ALL}", end=end)
+
     def append_message(role: str, message: str, _file_path: str="") -> bool:
         if role not in TEXT_MODEL_CHAT_ROLES:
-            print(f"Cannot add messages from role '{role}' to the context!")
+            new_print(f"Cannot add messages from role '{role}' to the context", PRINT_COLORS["error"])
             return False
 
         is_message_empty: bool = message.rstrip() == ""
@@ -403,13 +415,13 @@ if __name__ == "__main__":
         is_file_generic_url: bool = is_generic_url(_file_path)
 
         if script_settings["disable_url_attachments"] and role == TEXT_MODEL_CHAT_ROLES[1] and is_file_valid_url:
-            print("URL attachments are disabled")
+            new_print("URL attachments are disabled", PRINT_COLORS["warning"])
             return append_message(role, message)
 
         if (is_file_valid_url and is_file_generic_url) or filename in TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES or file_extension in TEXT_MODEL_ATTACHMENT_GENERIC_EXTENSIONS:
             if not is_file_generic_url:
                 if not does_file_exist:
-                    print("File not found")
+                    new_print("File not found", PRINT_COLORS["warning"])
                     return append_message(role, message)
 
                 try:
@@ -419,7 +431,7 @@ if __name__ == "__main__":
                             "content": f"`{filename}`:\n\n```\n{_file.read()}\n```{f"\n\n{message}" if not is_message_empty else ""}",
                         })
                 except UnicodeDecodeError:
-                    print("File is unreadable")
+                    new_print("File is unreadable", PRINT_COLORS["warning"])
                     return append_message(role, message)
             else:
                 try:
@@ -430,19 +442,19 @@ if __name__ == "__main__":
                         "content": f"`{_file_path}`:\n\n```\n{url_content_response.text}\n```{f"\n\n{message}" if not is_message_empty else ""}",
                     })
                 except requests.HTTPError:
-                    print("URL not found")
+                    new_print("URL not found", PRINT_COLORS["warning"])
                     return append_message(role, message)
                 except requests.ConnectionError:
-                    print("Failed to resolve URL")
+                    new_print("Failed to resolve URL", PRINT_COLORS["warning"])
                     return append_message(role, message)
             return True
         elif file_extension in TEXT_MODEL_ATTACHMENT_IMAGE_EXTENSIONS:
             if not is_file_valid_url and not does_file_exist:
-                print("File not found")
+                new_print("File not found", PRINT_COLORS["warning"])
                 return append_message(role, message)
 
             if not text_model_modalities["vision"]:
-                print(f"Vision is not enabled for '{text_model_id}'")
+                new_print(f"Vision is not enabled for '{text_model_id}'", PRINT_COLORS["warning"])
                 return append_message(role, message)
 
             text_model_message_history.append({
@@ -463,11 +475,11 @@ if __name__ == "__main__":
             return True
         elif file_extension in TEXT_MODEL_ATTACHMENT_AUDIO_EXTENSIONS:
             if not does_file_exist:
-                print("File not found")
+                new_print("File not found", PRINT_COLORS["warning"])
                 return append_message(role, message)
 
             if not text_model_modalities["audio"]:
-                print(f"Audio is not enabled for '{text_model_id}'")
+                new_print(f"Audio is not enabled for '{text_model_id}'", PRINT_COLORS["warning"])
                 return append_message(role, message)
 
             text_model_message_history.append({
@@ -489,7 +501,7 @@ if __name__ == "__main__":
             return False
 
         if file_path_length > 0:
-            print("File does not exist or is unsupported")
+            new_print("File does not exist or is unsupported", PRINT_COLORS["warning"])
             if is_message_empty:
                 return False
         text_model_message_history.append({
@@ -509,13 +521,13 @@ if __name__ == "__main__":
         if text_model_health_response.status_code == 200:
             global text_model_server_active
             text_model_server_active = True
-            print("Text model server is online")
+            new_print("Text model server is online", PRINT_COLORS["success"])
 
     def is_image_model_server_online() -> bool:
         try:
             image_model_info_response: requests.Response = requests.get(f"{image_model_server_url}/sdapi/v1/sd-models")
             if len(image_model_info_response.json()) > 0:
-                print("Image model server is online\n")
+                new_print("Image model server is online\n", PRINT_COLORS["success"])
                 return True
             return False
         except requests.exceptions.ConnectionError:
@@ -613,9 +625,9 @@ if __name__ == "__main__":
                             if subkey in new_script_settings[key] and type(new_script_settings[key][subkey]) == type(subvalue):
                                 script_settings[key][subkey] = new_script_settings[key][subkey]
                             else:
-                                print(f"Malformed setting '{key}.{subkey}'")
+                                new_print(f"Malformed setting '{key}.{subkey}'", PRINT_COLORS["warning"])
                 else:
-                    print(f"Malformed setting '{key}'")
+                    new_print(f"Malformed setting '{key}'", PRINT_COLORS["warning"])
 
             # Validate script_mode.
             if script_settings["script_mode"] not in SCRIPT_MODES:
@@ -678,25 +690,27 @@ if __name__ == "__main__":
                 if file_contents != "":
                     append_message(TEXT_MODEL_CHAT_ROLES[0], file_contents)
         except UnicodeDecodeError:
-            print("Malformed system prompt")
+            new_print("Malformed system prompt", PRINT_COLORS["warning"])
 
-    print(f"Script will run in {get_current_script_mode()} Mode\n")
+    new_print(f"Script will run in {get_current_script_mode()} Mode\n", PRINT_COLORS["special"])
 
     try:
         poll_text_model_server_api()
     except requests.exceptions.ConnectionError:
-        llama_cpp_dir_path: str = strip_leading_and_trailing_quotes(input("Enter the path to llama.cpp: "))
-        llama_server_path: str = f"{llama_cpp_dir_path}{TEXT_MODEL_SERVER_FILENAME}"
-        if not os.path.exists(llama_server_path):
-            print("Invalid path!")
-            exit()
+        while True:
+            llama_cpp_dir_path: str = strip_leading_and_trailing_quotes(input("Enter the path to llama.cpp: "))
+            llama_server_path: str = f"{llama_cpp_dir_path}{TEXT_MODEL_SERVER_FILENAME}"
+            if os.path.exists(llama_server_path):
+                break
+            new_print(f"Directory is invalid or does not contain {TEXT_MODEL_SERVER_FILENAME}", PRINT_COLORS["error"])
 
-        text_model_path: str = strip_leading_and_trailing_quotes(input("Enter a text model path: "))
-        if not os.path.exists(text_model_path) or get_path_extension(text_model_path, False) != TEXT_MODEL_EXTENSION:
-            print("File does not exist or is not a valid model!")
-            exit()
+        while True:
+            text_model_path: str = strip_leading_and_trailing_quotes(input("Enter a text model path: "))
+            if os.path.exists(text_model_path) and get_path_extension(text_model_path, False) == TEXT_MODEL_EXTENSION:
+                break
+            new_print("File does not exist or is not a text model", PRINT_COLORS["error"])
 
-        print("Starting llama.cpp (text model server)")
+        new_print("Starting llama.cpp (text model server)", PRINT_COLORS["success"])
         text_model_mmproj_path: str = f"{text_model_path.removesuffix(TEXT_MODEL_EXTENSION)}-mmproj{TEXT_MODEL_EXTENSION}"
         does_text_model_mmproj_exist: bool = os.path.exists(text_model_mmproj_path) if not script_settings["text_model_init_settings"]["disable_mmproj"] else False
         arguments: list[str] = [
@@ -725,7 +739,7 @@ if __name__ == "__main__":
             try:
                 poll_text_model_server_api()
             except requests.exceptions.ConnectionError:
-                print("Text model server was closed")
+                new_print("Text model server was closed", PRINT_COLORS["error"])
                 exit()
         else:
             try:
@@ -738,16 +752,16 @@ if __name__ == "__main__":
                     if key in text_model_modalities:
                         text_model_modalities[key] = value
                     else:
-                        print(f"Text model server supports modality '{key}' but it's not implemented in the script")
+                        new_print(f"Text model server supports modality '{key}' but it's not implemented in the script", PRINT_COLORS["warning"])
 
                 text_model_modalities_string: str = ""
                 for key, value in text_model_modalities.items():
                     text_model_modalities_string += f"{key.capitalize()}: {value}, "
                 text_model_modalities_string = text_model_modalities_string.removesuffix(", ")
-                print(f"Running {text_model_id}{f" ({text_model_modalities_string})" if len(text_model_modalities) > 0 else ""}\n")
+                new_print(f"Running {text_model_id}{f" ({text_model_modalities_string})" if len(text_model_modalities) > 0 else ""}\n", PRINT_COLORS["success"])
                 break
             except requests.exceptions.ConnectionError:
-                print("Text model server was closed")
+                new_print("Text model server was closed", PRINT_COLORS["error"])
                 exit()
         time.sleep(SERVER_CHECK_INTERVAL)
 
@@ -755,19 +769,21 @@ if __name__ == "__main__":
     if script_settings["script_mode"] == SCRIPT_MODES[0] and script_settings["enable_image_model_server_in_chat"]:
         image_model_server_active = is_image_model_server_online()
         if not image_model_server_active:
-            koboldcpp_dir_path: str = strip_leading_and_trailing_quotes(input("Enter the path to KoboldCpp: "))
-            koboldcpp_path: str = f"{koboldcpp_dir_path}koboldcpp.exe"
-            if not os.path.exists(koboldcpp_path):
-                print("Invalid path!")
-                exit()
+            while True:
+                koboldcpp_dir_path: str = strip_leading_and_trailing_quotes(input("Enter the path to KoboldCpp: "))
+                koboldcpp_path: str = f"{koboldcpp_dir_path}{IMAGE_MODEL_SERVER_FILENAME}"
+                if os.path.exists(koboldcpp_path):
+                    break
+                new_print(f"Directory is invalid or does not contain {IMAGE_MODEL_SERVER_FILENAME}", PRINT_COLORS["error"])
 
-            image_model_path: str = strip_leading_and_trailing_quotes(input("Enter an image model path: "))
-            image_model_extension: str = get_path_extension(image_model_path, False)
-            if not os.path.exists(image_model_path) or image_model_extension not in IMAGE_MODEL_EXTENSIONS:
-                print("File does not exist or is not a valid model!")
-                exit()
+            while True:
+                image_model_path: str = strip_leading_and_trailing_quotes(input("Enter an image model path: "))
+                image_model_extension: str = get_path_extension(image_model_path, False)
+                if os.path.exists(image_model_path) and image_model_extension in IMAGE_MODEL_EXTENSIONS:
+                    break
+                new_print("File does not exist or is not an image model", PRINT_COLORS["error"])
 
-            print("Starting KoboldCpp (image model server)")
+            new_print("Starting KoboldCpp (image model server)", PRINT_COLORS["success"])
             arguments: list[str] = [
                 "--skiplauncher",
                 f"--port {script_settings["image_model_init_settings"]["server_port"]}",
@@ -785,7 +801,7 @@ if __name__ == "__main__":
             image_model_server_checks: int = 0
             while True:
                 if image_model_server_checks > IMAGE_MODEL_MAX_SERVER_CHECKS:
-                    print("Image model server was closed or image model took too long to load\n")
+                    new_print("Image model server was closed or image model took too long to load\n", PRINT_COLORS["error"])
                     break
 
                 image_model_server_checks += 1
@@ -796,20 +812,20 @@ if __name__ == "__main__":
 
     while True:
         if script_settings["script_mode"] == SCRIPT_MODES[0]: # Chat Mode
-            user_message: str = input("USER: ")
+            user_message: str = input(f"{PRINT_COLORS["user_prefix"]}USER: {colorama.Style.RESET_ALL}")
             command: str = user_message.strip()
 
             if command == COMMAND_IMAGE_ALIAS:
                 if not image_model_server_active:
-                    print("Image model server is offline")
+                    new_print("Image model server is offline", PRINT_COLORS["error"])
                     continue
 
                 image_positive_prompt: str = input("Enter a positive prompt: ").strip()
                 if image_positive_prompt == "":
-                    print("Cannot generate images with an empty positive prompt!")
+                    new_print("Cannot generate images with an empty positive prompt", PRINT_COLORS["error"])
                     continue
                 image_negative_prompt: str = input("Enter a negative prompt (optional): ").strip()
-                print("Generating...")
+                new_print("Generating...", PRINT_COLORS["success"])
 
                 try:
                     payload: dict = {
@@ -839,17 +855,17 @@ if __name__ == "__main__":
                         else:
                             append_message(TEXT_MODEL_CHAT_ROLES[1], f"**Positive Prompt:** {image_positive_prompt}\n**Negative Prompt:** {image_negative_prompt}\n\nGenerate an image using the provided positive prompt and negative prompt.")
                         if append_message(TEXT_MODEL_CHAT_ROLES[2], model_message, image_output_path):
-                            print(f"\nMODEL: {model_message}\n")
+                            print(f"\n{PRINT_COLORS["model_prefix"]}MODEL: {colorama.Style.RESET_ALL}{model_message}\n")
                     else:
-                        print(f"\nMODEL: {model_message} This message won't be added to the context as I cannot see images.\n")
+                        print(f"\n{PRINT_COLORS["model_prefix"]}MODEL: {colorama.Style.RESET_ALL}{model_message} This message won't be added to the context as I cannot see images.\n")
                 except requests.exceptions.ConnectionError:
                     image_model_server_active = False
-                    print("Image model server was closed")
+                    new_print("Image model server was closed", PRINT_COLORS["error"])
             elif command == COMMAND_HELP_ALIAS:
-                print(f"{COMMAND_IMAGE_ALIAS} - Generate an image (requires the image model server to be online).")
-                print(f"{COMMAND_ATTACH_ALIAS} - Attach a file or URL to your message (command must be at the end of your message).")
-                print(f"{COMMAND_HELP_ALIAS} - Display all commands.")
-                print(f"{COMMAND_EXIT_ALIAS} - Exit the application.")
+                new_print(f"{COMMAND_IMAGE_ALIAS} - Generate an image (requires the image model server to be online).", PRINT_COLORS["special"])
+                new_print(f"{COMMAND_ATTACH_ALIAS} - Attach a file or URL to your message (command must be at the end of your message).", PRINT_COLORS["special"])
+                new_print(f"{COMMAND_HELP_ALIAS} - Display all commands.", PRINT_COLORS["special"])
+                new_print(f"{COMMAND_EXIT_ALIAS} - Exit the application.", PRINT_COLORS["special"])
             elif command == COMMAND_EXIT_ALIAS:
                 break
             else:
@@ -869,11 +885,10 @@ if __name__ == "__main__":
                         for key, value in construct_text_model_gen_parameters().items():
                             payload[key] = value
 
+                        new_print("\nMODEL: ", PRINT_COLORS["model_prefix"], "")
                         chat_response: requests.Response = requests.post(f"{text_model_server_url}/v1/chat/completions", json=payload, stream=script_settings["text_model_gen_settings"]["stream_responses"])
                         if not script_settings["text_model_gen_settings"]["stream_responses"]:
                             chat_response_data: dict = chat_response.json()
-
-                            print("\nMODEL: ", end="")
                             if "error" not in chat_response_data:
                                 model_message: str = chat_response_data["choices"][0]["message"]["content"]
                                 if append_message(TEXT_MODEL_CHAT_ROLES[2], process_text(model_message, script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"])):
@@ -892,7 +907,6 @@ if __name__ == "__main__":
                             model_message_buffer: str = ""
 
                             # Streaming code based on: https://gist.github.com/ggorlen/7c944d73e27980544e29aa6de1f2ac54
-                            print("\nMODEL: ", end="")
                             for line in chat_response.iter_lines():
                                 decoded_line: str = line.decode("utf-8")
                                 if decoded_line.startswith("data: ") and not decoded_line.endswith("[DONE]"):
@@ -903,18 +917,18 @@ if __name__ == "__main__":
                                 elif decoded_line.startswith("error: "):
                                     match json.loads(line[len("error: "):])["message"]:
                                         case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                            print("Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
+                                            new_print("Your message exceeds the available context size. Try increasing the context size or enable Context Shift.", PRINT_COLORS["error"], "")
                                         case _:
-                                            print("An error occurred.", end="")
+                                            new_print("An error occurred.", PRINT_COLORS["error"], "")
                                     print(" This message won't be added to the context.", end="")
                                     text_model_message_history.pop()
                                     break
                                 elif decoded_line.startswith("{\"error\":"):
                                     match json.loads(decoded_line)["error"]["message"]:
                                         case "Failed to load image or audio file":
-                                            print("This file is not encodable.", end="")
+                                            new_print("This file is not encodable.", PRINT_COLORS["error"], "")
                                         case _:
-                                            print("An error occurred.", end="")
+                                            new_print("An error occurred.", PRINT_COLORS["error"], "")
                                     print(" This message won't be added to the context.", end="")
                                     text_model_message_history.pop()
                                     break
@@ -922,15 +936,15 @@ if __name__ == "__main__":
                                 append_message(TEXT_MODEL_CHAT_ROLES[2], process_text(model_message_buffer, script_settings["text_model_gen_settings"]["chat_include_thoughts_in_history"]))
                             print("\n")
                     except requests.exceptions.ConnectionError:
-                        print("Text model server was closed")
+                        new_print("Text model server was closed", PRINT_COLORS["error"])
                         break
                     except requests.exceptions.ChunkedEncodingError:
-                        print("\nText model server was closed")
+                        new_print("\nText model server was closed", PRINT_COLORS["error"])
                         break
                 else:
-                    print("Cannot send empty messages!")
+                    new_print("Cannot send empty messages", PRINT_COLORS["error"])
         elif script_settings["script_mode"] == SCRIPT_MODES[1]: # Autocomplete Mode
-            prompt: str = input("> ")
+            prompt: str = input(f"{PRINT_COLORS["user_prefix"]}> {colorama.Style.RESET_ALL}")
             try:
                 payload: dict = {
                     "model": text_model_id,
@@ -945,13 +959,13 @@ if __name__ == "__main__":
                 if not script_settings["text_model_gen_settings"]["stream_responses"]:
                     text_response_data: dict = text_response.json()
                     if "error" not in text_response_data:
-                        print(f"{prompt}{text_response_data["content"]}\n")
+                        new_print(f"{prompt}{text_response_data["content"]}\n", PRINT_COLORS["model_prefix"])
                     else:
                         match text_response_data["error"]["message"]:
                             case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                print("Your prompt exceeds the available context size. Try increasing the context size or enable Context Shift.\n")
+                                new_print("Your prompt exceeds the available context size. Try increasing the context size or enable Context Shift.\n", PRINT_COLORS["error"])
                             case _:
-                                print("An error occurred.\n")
+                                new_print("An error occurred.\n", PRINT_COLORS["error"])
                 else:
                     was_prompt_printed: bool = False
                     for line in text_response.iter_lines():
@@ -959,14 +973,14 @@ if __name__ == "__main__":
                         if decoded_line.startswith("data: "):
                             if not was_prompt_printed:
                                 was_prompt_printed = True
-                                print(prompt, end="")
+                                print(f"{PRINT_COLORS["model_prefix"]}{prompt}", end="")
                             print(json.loads(line[len("data: "):])["content"], end="", flush=True)
                         elif decoded_line.startswith("error: "):
                             match json.loads(line[len("error: "):])["message"]:
                                 case "the request exceeds the available context size. try increasing the context size or enable context shift":
-                                    print("Your prompt exceeds the available context size. Try increasing the context size or enable Context Shift.", end="")
+                                    new_print("Your prompt exceeds the available context size. Try increasing the context size or enable Context Shift.", PRINT_COLORS["error"], "")
                                 case _:
-                                    print("An error occurred.", end="")
+                                    new_print("An error occurred.", PRINT_COLORS["error"], "")
                             break
                     print("\n")
             except requests.exceptions.ConnectionError:
