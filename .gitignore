@@ -1,5 +1,6 @@
-# Application settings
+# Application
 settings.json
+image_outputs/
 
 # Models
 *.gguf
