@@ -33,6 +33,14 @@ if __name__ == "__main__":
         "q5_1",
     ]
     TEXT_MODEL_EXTENSION: str = ".gguf"
+    TEXT_MODEL_ATTACHMENT_GENERIC_URL_PATTERNS: list[str] = [
+        r"https://github\.com/[^/]+/[^/]+/raw/",
+        r"https://raw\.githubusercontent\.com/[^/]+/[^/]+/",
+        r"https://gitlab\.com/[^/]+/[^/]+/-/raw/",
+        r"https://bitbucket\.org/[^/]+/[^/]+/raw/",
+        r"https://huggingface\.co/[^/]+/[^/]+/raw/",
+        r"https://pastebin\.com/raw/",
+    ]
     TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES: list[str] = [
         "LICENSE",
         "CODEOWNERS",
@@ -306,7 +314,6 @@ if __name__ == "__main__":
         ".safetensors",
         ".gguf",
     ]
-    IMAGE_MODEL_LORA_EXTENSION: str = ".safetensors"
     IMAGE_MODEL_MAX_SERVER_CHECKS: int = 20
     COMMAND_IMAGE_ALIAS: str = "/image"
     COMMAND_ATTACH_ALIAS: str = "/attach"
@@ -316,7 +323,7 @@ if __name__ == "__main__":
     script_settings: dict = {
         "script_mode": "chat",
         "text_model_init_settings": {
-            "server_port": 8080,
+            "server_port": 7820,
             "priority": 0,
             "use_flash_attention": True,
             "gpu_layers": 99,
@@ -332,6 +339,7 @@ if __name__ == "__main__":
             "context_size": 8192,
             "disable_mmproj": False,
         },
+        "disable_url_attachments": False,
         "text_model_gen_settings": {
             "stream_responses": True,
             "temperature": 0.8,
@@ -354,7 +362,7 @@ if __name__ == "__main__":
         },
         "enable_image_model_server_in_chat": False,
         "image_model_init_settings": {
-            "server_port": 5001,
+            "server_port": 7821,
             "hardware_acceleration": "cuda",
             "quantize_safetensors_on_server_start": False,
             "use_vae_tiling": True,
@@ -388,24 +396,44 @@ if __name__ == "__main__":
 
         is_message_empty: bool = message.rstrip() == ""
         file_path_length: int = len(_file_path)
+        filename: str = os.path.basename(_file_path)
         file_extension: str = get_path_extension(_file_path, False)
         is_file_url: bool = validators.url(_file_path)
         does_file_exist: bool = os.path.exists(_file_path)
 
-        if os.path.basename(_file_path) in TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES or file_extension in TEXT_MODEL_ATTACHMENT_GENERIC_EXTENSIONS:
-            if not does_file_exist:
-                print("File does not exist")
-                return append_message(role, message)
+        if script_settings["disable_url_attachments"] and role == TEXT_MODEL_CHAT_ROLES[1] and is_file_url:
+            print("URL attachments are disabled")
+            return append_message(role, message)
 
-            try:
-                with open(_file_path, "rt") as _file:
+        if (is_file_url and is_generic_url(_file_path)) or filename in TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES or file_extension in TEXT_MODEL_ATTACHMENT_GENERIC_EXTENSIONS:
+            if not is_file_url:
+                if not does_file_exist:
+                    print("File does not exist")
+                    return append_message(role, message)
+
+                try:
+                    with open(_file_path, "rt") as _file:
+                        text_model_message_history.append({
+                            "role": role,
+                            "content": f"`{filename}`:\n\n```\n{_file.read()}\n```{f"\n\n{message}" if not is_message_empty else ""}",
+                        })
+                except UnicodeDecodeError:
+                    print("File is unreadable")
+                    return append_message(role, message)
+            else:
+                try:
+                    url_content_response: requests.Response = requests.get(_file_path)
+                    url_content_response.raise_for_status()
                     text_model_message_history.append({
                         "role": role,
-                        "content": f"`{os.path.basename(_file_path)}`:\n\n```\n{_file.read()}\n```{f"\n\n{message}" if not is_message_empty else ""}"
+                        "content": f"`{_file_path}`:\n\n```\n{url_content_response.text}\n```{f"\n\n{message}" if not is_message_empty else ""}",
                     })
-            except UnicodeDecodeError:
-                print("File is unreadable")
-                return append_message(role, message)
+                except requests.HTTPError:
+                    print("URL not found")
+                    return append_message(role, message)
+                except requests.ConnectionError:
+                    print("Failed to resolve URL")
+                    return append_message(role, message)
             return True
         elif file_extension in TEXT_MODEL_ATTACHMENT_IMAGE_EXTENSIONS:
             if not is_file_url and not does_file_exist:
@@ -521,7 +549,7 @@ if __name__ == "__main__":
             return text
 
         text_buffer: str = ""
-        for pattern_match in re.findall("(<think>.*?</think>\n*)(.*?)(?=<think>|$)", text, re.DOTALL):
+        for pattern_match in re.findall(r"(<think>.*?</think>\n*)(.*?)(?=<think>|$)", text, re.DOTALL):
             text_buffer += pattern_match[1]
         return text_buffer
 
@@ -531,6 +559,12 @@ if __name__ == "__main__":
     def get_path_extension(path: str, omit_dot: bool) -> str:
         path_extension: str = os.path.splitext(path)[1].lower()
         return path_extension if not omit_dot else path_extension[1:]
+
+    def is_generic_url(url: str) -> bool:
+        for url_pattern in TEXT_MODEL_ATTACHMENT_GENERIC_URL_PATTERNS:
+            if re.search(url_pattern, url):
+                return True
+        return False
 
     def get_image_data(path: str) -> str:
         with open(path, "rb") as _file:
@@ -625,9 +659,9 @@ if __name__ == "__main__":
 
             # Validate server ports.
             if script_settings["text_model_init_settings"]["server_port"] == script_settings["image_model_init_settings"]["server_port"]:
-                script_settings["text_model_init_settings"]["server_port"] = 8080
+                script_settings["text_model_init_settings"]["server_port"] = 7820
             if script_settings["image_model_init_settings"]["server_port"] == script_settings["text_model_init_settings"]["server_port"]:
-                script_settings["image_model_init_settings"]["server_port"] = 5001
+                script_settings["image_model_init_settings"]["server_port"] = 7821
     with open(SCRIPT_SETTINGS_PATH, "wt") as file:
         json.dump(script_settings, file, indent=4)
 
@@ -656,7 +690,7 @@ if __name__ == "__main__":
             print("Invalid path!")
             exit()
 
-        text_model_path: str = strip_leading_and_trailing_quotes(input("Enter the path to your desired text model: "))
+        text_model_path: str = strip_leading_and_trailing_quotes(input("Enter a text model path: "))
         if not os.path.exists(text_model_path) or get_path_extension(text_model_path, False) != TEXT_MODEL_EXTENSION:
             print("File does not exist or is not a valid model!")
             exit()
@@ -726,31 +760,11 @@ if __name__ == "__main__":
                 print("Invalid path!")
                 exit()
 
-            image_model_path: str = strip_leading_and_trailing_quotes(input("Enter the path to your desired image model: "))
+            image_model_path: str = strip_leading_and_trailing_quotes(input("Enter an image model path: "))
             image_model_extension: str = get_path_extension(image_model_path, False)
             if not os.path.exists(image_model_path) or image_model_extension not in IMAGE_MODEL_EXTENSIONS:
                 print("File does not exist or is not a valid model!")
                 exit()
-
-            image_model_lora_path: str = ""
-            image_model_lora_multiplier: float = 0.5
-            if image_model_extension == IMAGE_MODEL_EXTENSIONS[0]:
-                image_model_lora_path = strip_leading_and_trailing_quotes(input("Enter the path to the LoRA you want to apply to the image model (optional): "))
-                if os.path.exists(image_model_lora_path) and get_path_extension(image_model_lora_path, False) == IMAGE_MODEL_LORA_EXTENSION:
-                    try:
-                        image_model_lora_multiplier = float(input("Enter the LoRA multiplier: "))
-                        if image_model_lora_multiplier < 0.0:
-                            image_model_lora_multiplier = 0.0
-                            print("LoRA multiplier cannot be lower than 0.0")
-                        elif image_model_lora_multiplier > 1.0:
-                            image_model_lora_multiplier = 1.0
-                            print("LoRA multiplier cannot be higher than 1.0")
-                    except ValueError:
-                        print(f"Invalid value, defaulting to {image_model_lora_multiplier}")
-                else:
-                    if len(image_model_lora_path) > 0:
-                        print("File does not exist or is not a valid LoRA!")
-                    image_model_lora_path = ""
 
             print("Starting KoboldCpp (image model server)")
             arguments: list[str] = [
@@ -762,8 +776,6 @@ if __name__ == "__main__":
                 "--usevulkan" if script_settings["image_model_init_settings"]["hardware_acceleration"] == IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[3] else "",
                 "--nomodel",
                 f"--sdmodel \"{image_model_path}\"",
-                f"--sdlora \"{image_model_lora_path}\"" if image_model_lora_path != "" else "",
-                f"--sdloramult {image_model_lora_multiplier}" if image_model_lora_path != "" else "",
                 "--sdnotile" if not script_settings["image_model_init_settings"]["use_vae_tiling"] else "",
                 "--sdquant" if image_model_extension == IMAGE_MODEL_EXTENSIONS[0] and script_settings["image_model_init_settings"]["quantize_safetensors_on_server_start"] else "",
             ]
@@ -834,8 +846,8 @@ if __name__ == "__main__":
                     print("Image model server was closed")
             elif command == COMMAND_HELP_ALIAS:
                 print(f"{COMMAND_IMAGE_ALIAS} - Generate an image (requires the image model server to be online).")
-                print(f"{COMMAND_ATTACH_ALIAS} - Attach a file or image URL to your message (must be at the end of your message).")
-                print(f"{COMMAND_HELP_ALIAS} - Show all commands.")
+                print(f"{COMMAND_ATTACH_ALIAS} - Attach a file or URL to your message (command must be at the end of your message).")
+                print(f"{COMMAND_HELP_ALIAS} - Display all commands.")
                 print(f"{COMMAND_EXIT_ALIAS} - Exit the application.")
             elif command == COMMAND_EXIT_ALIAS:
                 break
@@ -843,7 +855,7 @@ if __name__ == "__main__":
                 file_path: str = ""
 
                 if command.endswith(COMMAND_ATTACH_ALIAS):
-                    file_path = strip_leading_and_trailing_quotes(input("Enter the path to the file that will be attached to your message: "))
+                    file_path = strip_leading_and_trailing_quotes(input("Enter a file path or URL: "))
                     user_message = user_message.removesuffix(COMMAND_ATTACH_ALIAS).rstrip()
 
                 if append_message(TEXT_MODEL_CHAT_ROLES[1], user_message, file_path):
