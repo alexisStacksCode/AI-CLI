@@ -13,6 +13,7 @@ if __name__ == "__main__":
     script_settings: dict = {
         "script_mode": "chat",
         "server_init_settings": {
+            "exe_startup_behavior": "subprocess",
             "port": 5005,
             "high_priority": False,
             "use_mmap": False,
@@ -30,7 +31,7 @@ if __name__ == "__main__":
             "kv_cache_data_type": "f16",
             "context_processing": "context_shift",
             "use_fast_forward": True,
-            "context_size": 4096,
+            "context_size": 8192,
         },
         "server_init_sd_settings": {
             "enable": False,
@@ -87,7 +88,7 @@ if __name__ == "__main__":
         "vision": False,
         "audio": False,
     }
-    text_model_message_history: list[dict] = []
+    text_model_chat_message_history: list[dict] = []
     can_generate_images_in_chat: bool = False
 
     def append_message(role: str, message: str, _file_path: str="") -> bool:
@@ -115,7 +116,7 @@ if __name__ == "__main__":
 
                 try:
                     with open(_file_path, "rt") as _file:
-                        text_model_message_history.append({
+                        text_model_chat_message_history.append({
                             "role": role,
                             "content": f"`{filename}`:\n\n```\n{_file.read()}\n```{f"\n\n{message}" if not is_message_empty else ""}",
                         })
@@ -126,7 +127,7 @@ if __name__ == "__main__":
                 try:
                     url_content_response: requests.Response = requests.get(_file_path)
                     url_content_response.raise_for_status()
-                    text_model_message_history.append({
+                    text_model_chat_message_history.append({
                         "role": role,
                         "content": f"`{_file_path}`:\n\n```\n{url_content_response.text}\n```{f"\n\n{message}" if not is_message_empty else ""}",
                     })
@@ -146,7 +147,7 @@ if __name__ == "__main__":
                 opengpt_utils.new_print(f"Vision is not enabled for '{text_model_id}'", opengpt_constants.PRINT_COLORS["warning"])
                 return append_message(role, message)
 
-            text_model_message_history.append({
+            text_model_chat_message_history.append({
                 "role": role,
                 "content": [
                     {
@@ -171,7 +172,7 @@ if __name__ == "__main__":
                 opengpt_utils.new_print(f"Audio is not enabled for '{text_model_id}'", opengpt_constants.PRINT_COLORS["warning"])
                 return append_message(role, message)
 
-            text_model_message_history.append({
+            text_model_chat_message_history.append({
                 "role": role,
                 "content": [
                     {
@@ -193,7 +194,7 @@ if __name__ == "__main__":
             opengpt_utils.new_print("File does not exist or is unsupported", opengpt_constants.PRINT_COLORS["warning"])
             if is_message_empty:
                 return False
-        text_model_message_history.append({
+        text_model_chat_message_history.append({
             "role": role,
             "content": message,
         })
@@ -212,8 +213,8 @@ if __name__ == "__main__":
         except requests.ConnectionError:
             return False
 
+    # noinspection PyShadowingNames
     def is_text_model_multimodal() -> bool:
-        # noinspection PyShadowingNames
         for value in text_model_modalities.values():
             if value:
                 return True
@@ -247,6 +248,17 @@ if __name__ == "__main__":
             "frequency_penalty": script_settings["text_model_settings"]["frequency_penalty"],
         }
 
+    # noinspection PyShadowingNames
+    def get_text_model_chat_total_tokens() -> int:
+        tokens: int = 0
+        for message in text_model_chat_message_history:
+            payload: dict = {
+                "prompt": message["content"] if type(message["content"]) == str else message["content"][0]["text"],
+            }
+            token_count_response: requests.Response = requests.get(f"{server_url}/api/extra/tokencount", json=payload)
+            tokens += token_count_response.json()["value"]
+        return tokens
+
     def validate_image_model_optional_file(path: str) -> str:
         if len(path) > 0 and (not os.path.exists(path) or opengpt_utils.get_file_extension(path, False) != ".safetensors"):
             opengpt_utils.new_print("File does not exist or its extension isn't .safetensors", opengpt_constants.PRINT_COLORS["warning"])
@@ -275,6 +287,8 @@ if __name__ == "__main__":
                 script_settings["script_mode"] = "chat"
 
             # Validate server_init_settings.
+            if script_settings["server_init_settings"]["exe_startup_behavior"] not in opengpt_constants.SERVER_STARTUP_BEHAVIOR_OPTIONS:
+                script_settings["server_init_settings"]["exe_startup_behavior"] = "subprocess"
             script_settings["server_init_settings"]["port"] = opengpt_utils.clamp_int(script_settings["server_init_settings"]["port"], 1000, 9999)
             if script_settings["server_init_settings"]["gpu_acceleration"] not in opengpt_constants.SERVER_GPU_ACCELERATION_OPTIONS:
                 script_settings["server_init_settings"]["gpu_acceleration"] = "cuda"
@@ -400,6 +414,7 @@ if __name__ == "__main__":
             "--smartcontext" if script_settings["server_init_lm_settings"]["context_processing"] == "smart_context" else "",
             "--nofastforward" if not script_settings["server_init_lm_settings"]["use_fast_forward"] else "",
             f"--contextsize {script_settings["server_init_lm_settings"]["context_size"]}",
+            f"--defaultgenamt {script_settings["server_init_lm_settings"]["context_size"]}",
             "--sdnotile" if script_settings["server_init_sd_settings"]["enable"] and not script_settings["server_init_sd_settings"]["use_vae_tiling"] else "",
             "--sdquant" if script_settings["server_init_sd_settings"]["enable"] and script_settings["server_init_sd_settings"]["quantize_safetensors_on_startup"] and image_model_extension == ".safetensors" else "",
             f"--model \"{text_model_path}\"",
@@ -412,10 +427,13 @@ if __name__ == "__main__":
             f"--sdlora \"{image_model_lora_path}\"" if script_settings["server_init_sd_settings"]["enable"] and image_model_lora_path != "" else "",
             f"--sdloramult {image_model_lora_multiplier}" if script_settings["server_init_sd_settings"]["enable"] and image_model_lora_path != "" else "",
         ])
-
         match opengpt_utils.get_file_extension(koboldcpp_path, False):
             case ".exe":
-                os.startfile(koboldcpp_path, arguments=arguments)
+                match script_settings["server_init_settings"]["exe_startup_behavior"]:
+                    case "separate_process":
+                        os.startfile(koboldcpp_path, arguments=arguments)
+                    case "subprocess":
+                        subprocess.Popen(f"{koboldcpp_path}{f" {arguments}" if len(arguments) > 0 else ""}")
             case ".py":
                 subprocess.Popen(f"python {koboldcpp_path} {arguments}")
 
@@ -450,7 +468,6 @@ if __name__ == "__main__":
 
                     can_generate_images_in_chat = True
                     opengpt_utils.new_print(f"Image Model: {image_model_info_response.json()[0]["model_name"]}", opengpt_constants.PRINT_COLORS["success"])
-                print("\n", end="")
                 break
             except requests.ConnectionError:
                 opengpt_utils.new_print("404", opengpt_constants.PRINT_COLORS["error"])
@@ -465,6 +482,7 @@ if __name__ == "__main__":
         except UnicodeDecodeError:
             opengpt_utils.new_print("Malformed system prompt", opengpt_constants.PRINT_COLORS["warning"], "")
 
+    print("\n", end="")
     while True:
         match script_settings["script_mode"]:
             case "chat":
@@ -535,13 +553,16 @@ if __name__ == "__main__":
 
                     # TODO: for KoboldCpp server branch, convert leftover llama.cpp stuff to KoboldCpp
                     if append_message("user", user_message, file_path):
+                        if script_settings["server_init_lm_settings"]["context_processing"] == "none" and get_text_model_chat_total_tokens() >= text_model_context_size:
+                            opengpt_utils.new_print("Your message exceeds the available context size. Try increasing the context size or enable Context Shift/Smart Context.", opengpt_constants.PRINT_COLORS["error"])
+                            continue
+
                         try:
                             payload: dict = {
                                 "model": text_model_id,
-                                "messages": text_model_message_history,
+                                "messages": text_model_chat_message_history,
                                 "stream": script_settings["text_model_settings"]["stream_responses"],
                                 "max_context_length": text_model_context_size,
-                                "max_completion_tokens": 8192,
                             }
                             for key, value in construct_text_model_gen_parameters().items():
                                 payload[key] = value
@@ -564,7 +585,7 @@ if __name__ == "__main__":
                                         case _:
                                             print("An error occurred.", end="")
                                     print(" This message won't be added to the context.\n")
-                                    text_model_message_history.pop()
+                                    text_model_chat_message_history.pop()
                             else:
                                 model_message_buffer: str = ""
 
@@ -575,7 +596,7 @@ if __name__ == "__main__":
                                         model_message_data: dict = json.loads(line[len("data: "):])["choices"][0]
 
                                         if model_message_data["finish_reason"] == "length" and model_message_data["delta"]["content"] == "":
-                                            text_model_message_history.pop()
+                                            text_model_chat_message_history.pop()
                                             opengpt_utils.new_print("An error occurred.", opengpt_constants.PRINT_COLORS["error"], "")
                                             break
 
@@ -589,7 +610,7 @@ if __name__ == "__main__":
                                             case _:
                                                 opengpt_utils.new_print("An error occurred.", opengpt_constants.PRINT_COLORS["error"], "")
                                         print(" This message won't be added to the context.", end="")
-                                        text_model_message_history.pop()
+                                        text_model_chat_message_history.pop()
                                         break
                                     elif decoded_line.startswith("{\"error\":"):
                                         match json.loads(decoded_line)["error"]["message"]:
@@ -598,7 +619,7 @@ if __name__ == "__main__":
                                             case _:
                                                 opengpt_utils.new_print("An error occurred.", opengpt_constants.PRINT_COLORS["error"], "")
                                         print(" This message won't be added to the context.", end="")
-                                        text_model_message_history.pop()
+                                        text_model_chat_message_history.pop()
                                         break
                                 if model_message_buffer != "":
                                     append_message("assistant", opengpt_utils.process_text(model_message_buffer, script_settings["text_model_settings"]["chat_include_thoughts_in_history"]))

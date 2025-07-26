@@ -27,6 +27,10 @@ SERVER_FILENAMES: list[str] = [
 ]
 SERVER_CHECK_INTERVAL: float = 1.0
 MAX_SERVER_CHECKS: int = 20
+SERVER_STARTUP_BEHAVIOR_OPTIONS: list[str] = [
+    "separate_process",
+    "subprocess",
+]
 SERVER_GPU_ACCELERATION_OPTIONS: list[str] = [
     "none",
     "cuda",
