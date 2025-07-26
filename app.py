@@ -1,4 +1,5 @@
 import os
+import subprocess
 import base64
 import json
 import re
@@ -23,6 +24,10 @@ if __name__ == "__main__":
         "special": colorama.Fore.LIGHTCYAN_EX,
     }
     SERVER_CHECK_INTERVAL: float = 1.0
+    SERVER_STARTUP_BEHAVIOR_OPTIONS: list[str] = [
+        "separate_process",
+        "subprocess",
+    ]
     TEXT_MODEL_SERVER_FILENAME: str = "llama-server.exe"
     TEXT_MODEL_CHAT_SYSTEM_PROMPT_PATH: str = "chat_system_prompt.txt"
     TEXT_MODEL_CHAT_ROLES: list[str] = [
@@ -331,6 +336,7 @@ if __name__ == "__main__":
 
     script_settings: dict = {
         "script_mode": "chat",
+        "server_startup_behavior": "subprocess",
         "text_model_init_settings": {
             "server_port": 7820,
             "priority": 0,
@@ -633,6 +639,10 @@ if __name__ == "__main__":
             if script_settings["script_mode"] not in SCRIPT_MODES:
                 script_settings["script_mode"] = SCRIPT_MODES[0]
 
+            # Validate server_startup_behavior.
+            if script_settings["server_startup_behavior"] not in SERVER_STARTUP_BEHAVIOR_OPTIONS:
+                script_settings["server_startup_behavior"] = SERVER_STARTUP_BEHAVIOR_OPTIONS[1]
+
             # Validate text_model_init_settings.
             script_settings["text_model_init_settings"]["server_port"] = clamp_int(script_settings["text_model_init_settings"]["server_port"], 1000, 9999)
             script_settings["text_model_init_settings"]["priority"] = clamp_int(script_settings["text_model_init_settings"]["priority"], 0, 3)
@@ -713,7 +723,7 @@ if __name__ == "__main__":
         new_print("Starting llama.cpp (text model server)", PRINT_COLORS["success"])
         text_model_mmproj_path: str = f"{text_model_path.removesuffix(TEXT_MODEL_EXTENSION)}-mmproj{TEXT_MODEL_EXTENSION}"
         does_text_model_mmproj_exist: bool = os.path.exists(text_model_mmproj_path) if not script_settings["text_model_init_settings"]["disable_mmproj"] else False
-        arguments: list[str] = [
+        arguments: str = construct_arguments([
             f"--port {script_settings["text_model_init_settings"]["server_port"]}",
             f"--prio-batch {script_settings["text_model_init_settings"]["priority"]}",
             "--flash-attn" if script_settings["text_model_init_settings"]["use_flash_attention"] else "",
@@ -731,8 +741,11 @@ if __name__ == "__main__":
             f"--mmproj \"{text_model_mmproj_path}\"" if does_text_model_mmproj_exist else "",
             f"--ctx-size {script_settings["text_model_init_settings"]["context_size"]}",
             "--keep -1",
-        ]
-        os.startfile(llama_server_path, arguments=construct_arguments(arguments))
+        ])
+        if script_settings["server_startup_behavior"] == SERVER_STARTUP_BEHAVIOR_OPTIONS[0]:
+            os.startfile(llama_server_path, arguments=arguments)
+        elif script_settings["server_startup_behavior"] == SERVER_STARTUP_BEHAVIOR_OPTIONS[1]:
+            subprocess.Popen(f"{llama_server_path} {arguments}", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     while True:
         if not text_model_server_active:
@@ -784,7 +797,7 @@ if __name__ == "__main__":
                 new_print("File does not exist or is not an image model", PRINT_COLORS["error"])
 
             new_print("Starting KoboldCpp (image model server)", PRINT_COLORS["success"])
-            arguments: list[str] = [
+            arguments: str = construct_arguments([
                 "--skiplauncher",
                 f"--port {script_settings["image_model_init_settings"]["server_port"]}",
                 "--usecpu" if script_settings["image_model_init_settings"]["hardware_acceleration"] == IMAGE_MODEL_HARDWARE_ACCELERATION_OPTIONS[0] else "",
@@ -795,8 +808,11 @@ if __name__ == "__main__":
                 f"--sdmodel \"{image_model_path}\"",
                 "--sdnotile" if not script_settings["image_model_init_settings"]["use_vae_tiling"] else "",
                 "--sdquant" if image_model_extension == IMAGE_MODEL_EXTENSIONS[0] and script_settings["image_model_init_settings"]["quantize_safetensors_on_server_start"] else "",
-            ]
-            os.startfile(koboldcpp_path, arguments=construct_arguments(arguments))
+            ])
+            if script_settings["server_startup_behavior"] == SERVER_STARTUP_BEHAVIOR_OPTIONS[0]:
+                os.startfile(koboldcpp_path, arguments=arguments)
+            elif script_settings["server_startup_behavior"] == SERVER_STARTUP_BEHAVIOR_OPTIONS[1]:
+                subprocess.Popen(f"{koboldcpp_path} {arguments}", stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
             image_model_server_checks: int = 0
             while True:
