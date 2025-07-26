@@ -1,1 +1,0 @@
-python app_sd_gen_settings_presets.py

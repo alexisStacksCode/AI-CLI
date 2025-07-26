@@ -1,1 +1,1 @@
-python app.py
+python opengpt.py
