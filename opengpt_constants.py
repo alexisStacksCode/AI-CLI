@@ -25,6 +25,12 @@ TEXT_MODEL_KV_CACHE_DATA_TYPES: list[str] = [
     "f32",
     "f16",
     "bf16",
+    "q8_0",
+    "q4_0",
+    "q4_1",
+    "iq4_nl",
+    "q5_0",
+    "q5_1",
 ]
 TEXT_MODEL_RESPONSE_STREAM_OPTIONS: list[str] = [
     "off",
