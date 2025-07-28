@@ -8,7 +8,7 @@ AI_MODES: list[str] = [
     "chat",
     "autocomplete",
 ]
-SETTINGS_PATH: str = "./settings.json"
+SETTINGS_PATH: str = "data/settings.json"
 SERVER_FILENAME: str = "llama-server.exe"
 PRINT_COLORS: dict[str, str] = {
     "reset": Fore.RESET,
@@ -20,7 +20,7 @@ PRINT_COLORS: dict[str, str] = {
     "error": Fore.LIGHTRED_EX,
 }
 TEXT_MODEL_EXTENSION: str = ".gguf"
-TEXT_MODEL_CHAT_SYSTEM_PROMPT_PATH: str = "chat_system_prompt.txt"
+TEXT_MODEL_CHAT_SYSTEM_PROMPT_PATH: str = "data/chat_system_prompt.txt"
 TEXT_MODEL_KV_CACHE_DATA_TYPES: list[str] = [
     "f32",
     "f16",
