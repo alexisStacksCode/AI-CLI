@@ -1,9 +1,6 @@
 from typing import Any
 from colorama import Fore
 
-REPOSITORY_OWNER: str = "alexisStacksCode"
-REPOSITORY_NAME: str = "OpenGPT-CLI"
-VERSION: str = "v1.1.0"
 AI_MODES: list[str] = [
     "chat",
     "autocomplete",

@@ -89,8 +89,6 @@ if __name__ == "__main__":
             content_buffer += match[1]
         return content_buffer
 
-    opengpt_internet.check_for_updates()
-
     if os.path.exists(opengpt_constants.SETTINGS_PATH):
         try:
             with open(opengpt_constants.SETTINGS_PATH, "rt") as file:
