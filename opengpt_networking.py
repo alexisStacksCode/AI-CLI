@@ -103,14 +103,14 @@ def generate_image(api_type: str, server_url: str, gen_params: dict[str, Any]) -
                         payload["sampler_name"] = "Euler a"
 
                         opengpt_utils.new_print("Generating...", opengpt_constants.PRINT_COLORS["success"])
-                        image_data: dict[str, Any] = requests.post(f"{server_url}/sdapi/v1/txt2img", json=payload).json()
-                        return _build_image_data(image_data["images"][0], payload["prompt"], payload["negative_prompt"]), calculate_gen_time()
+                        image_base64: str = requests.post(f"{server_url}/sdapi/v1/txt2img", json=payload).json()["images"][0]
+                        return _build_image_data(image_base64, payload["prompt"], payload["negative_prompt"]), calculate_gen_time()
                     except requests.exceptions.ConnectionError:
                         return "Stable Diffusion WebUI - An error occurred", 0.0
                 else:
                     return "Stable Diffusion WebUI - No image models loaded", 0.0
-            except requests.ConnectionError:
-                return "Stable Diffusion WebUI - Failed to retrieve model list. Is it running with the API enabled?", 0.0
+            except requests.exceptions.ConnectionError:
+                return "Stable Diffusion WebUI - Failed to retrieve model list. Is it running?", 0.0
         case "swarmui":
             try:
                 # this is so API calls can be made to SwarmUI
