@@ -1,8 +1,17 @@
+import base64
 from typing import Any
-import time
-import requests
 import opengpt_constants
 import opengpt_utils
+from stable_diffusion_cpp import StableDiffusion  # type: ignore
+import os
+import io
+from PIL import Image
+import re
+import time
+import requests
+
+
+_image_model: StableDiffusion | None = None
 
 
 def get_llama_server_status(server_url: str) -> bool:
@@ -35,58 +44,76 @@ def get_llama_server_info(server_url: str) -> tuple[str, dict[str, bool]]:
     return model_id, model_modalities
 
 
-def generate_image(api_type: str, server_url: str, gen_params: dict[str, Any]) -> tuple[dict[str, Any] | str, float]:
+def generate_image(api_type: str, server_url: str, gen_params_match: re.Match[str]) -> tuple[dict[str, str] | str, float]:
     """
     Generate an image using the specified API.
 
     Args:
-        api_type: The API used to generate images. Can be "sd_webui", "swarmui", or "koboldcpp".
+        api_type: The API used to generate images. Can be "internal", "sd_webui", "swarmui", or "koboldcpp".
         server_url: The base URL of the API server.
-        gen_params: Image generation parameters.
+        gen_params_match: Image generation parameters.
 
     Returns:
         A tuple containing the image data (or error message if the process failed) and image generation time.
     """
 
-    # TODO: reimplement value validation
-    for gen_param_info in opengpt_constants.IMAGE_MODEL_AVAILABLE_GEN_PARAMS.values():
-        real_name: str | None = gen_param_info["maps_to"][api_type]
-        if real_name is None:
-            continue
-
-        if gen_params[real_name] is None and "default_value" in gen_param_info:
-            gen_params[real_name] = gen_param_info["default_value"]
-
-        if type(gen_params[real_name]) == str:
-            if gen_param_info["type"] == bool:
-                match gen_params[real_name]:
-                    case "true":
-                        gen_params[real_name] = True
-                    case "false":
-                        gen_params[real_name] = False
-                    case _:
-                        gen_params[real_name] = True if "default_value" not in gen_param_info else \
-                        gen_param_info["default_value"]
-            elif gen_param_info["type"] == float:
-                gen_params[real_name] = float(gen_params[real_name])
-            elif gen_param_info["type"] == int:
-                gen_params[real_name] = int(gen_params[real_name])
-
-    payload: dict[str, Any] = gen_params.copy()
+    payload: dict[str, Any] = opengpt_utils.parse_regex_match(opengpt_constants.IMAGE_MODEL_GEN_PARAMS_SCHEMA, gen_params_match, api_type)
     start_time: float = time.time()
 
     calculate_gen_time = lambda: time.time() - start_time
 
     match api_type:
+        case "internal":
+            global _image_model
+
+            if payload["unload_model"]:
+                _image_model = None
+                opengpt_utils.new_print("Unloaded image model", opengpt_constants.PRINT_COLORS["success"])
+
+            if _image_model is None:
+                pattern: str = opengpt_utils.build_regex_pattern(opengpt_constants.IMAGE_MODEL_INTERNAL_INIT_PARAMS_SCHEMA, "", "")
+
+                match: re.Match[str] | None = re.match(pattern, input("No image model is loaded. Select one: ").strip())
+                if match is not None:
+                    try:
+                        init_params: dict[str, Any] = opengpt_utils.parse_regex_match(opengpt_constants.IMAGE_MODEL_INTERNAL_INIT_PARAMS_SCHEMA, match, "")
+                        model_path_split: list[str] = init_params["model_path"].split(":", 1)
+
+                        if not os.path.exists(model_path_split[1]) or opengpt_utils.get_file_extension(model_path_split[1]) not in [".safetensors", ".gguf"]:
+                            return "File does not exist nor is a valid text model", 0.0
+
+                        match model_path_split[0]:
+                            case "sd":
+                                init_params["model_path"] = model_path_split[1]
+                            case "flux":
+                                init_params.pop("model_path")
+                                init_params["diffusion_model_path"] = model_path_split[1]
+                            case _:
+                                return "Unknown image model type", 0.0
+                        init_params["verbose"] = True
+
+                        opengpt_utils.new_print("Loading image model", opengpt_constants.PRINT_COLORS["success"])
+                        _image_model = StableDiffusion(**init_params)
+                    except ValueError:
+                        return "OpenGPT-CLI - Failed to load image model", 0.0
+
+            payload.pop("unload_model")
+            payload["seed"] = -1
+
+            opengpt_utils.new_print("Generating...", opengpt_constants.PRINT_COLORS["success"])
+            image: Image = _image_model.txt_to_img(**payload)[0]
+            image_buffer: io.BytesIO = io.BytesIO()
+            image.save(image_buffer, "png")
+            image_base64: str = base64.b64encode(image_buffer.getvalue()).decode()
+            return _build_image_data(image_base64, payload["prompt"], payload["negative_prompt"]), calculate_gen_time()
         case "sd_webui" | "koboldcpp":
             try:
                 loaded_model_ids: list[dict[str, Any]] = requests.get(f"{server_url}/sdapi/v1/sd-models").json()
                 if len(loaded_model_ids) > 0:
                     try:
-                        # here, we attempt to generate a throwaway image. if the JSON has the images dictionary, it means
-                        # the API is enabled. if KoboldCpp (which implements SD WebUI-compatible API) is used, there's
-                        # no need to check API availability.
                         if api_type == "sd_webui":
+                            # here, we attempt to generate a throwaway image. if the JSON has the images dictionary, it means
+                            # the API is enabled.
                             dummy_payload: dict[str, Any] = {
                                 "prompt": "cat",
                                 "width": 64,
@@ -96,8 +123,9 @@ def generate_image(api_type: str, server_url: str, gen_params: dict[str, Any]) -
                                 "scheduler": "Automatic",
                             }
                             if "images" not in requests.post(f"{server_url}/sdapi/v1/txt2img", json=dummy_payload).json():
-                                return "Stable Diffusion WebUI - API is disabled", 0.0
+                                return "Stable Diffusion Web UI - API is disabled", 0.0
 
+                            # this is not in KoboldCpp's SD Web UI API implementation.
                             payload["scheduler"] = "Automatic"
 
                         payload["sampler_name"] = "Euler a"
@@ -106,19 +134,19 @@ def generate_image(api_type: str, server_url: str, gen_params: dict[str, Any]) -
                         image_base64: str = requests.post(f"{server_url}/sdapi/v1/txt2img", json=payload).json()["images"][0]
                         return _build_image_data(image_base64, payload["prompt"], payload["negative_prompt"]), calculate_gen_time()
                     except requests.exceptions.ConnectionError:
-                        return "Stable Diffusion WebUI - An error occurred", 0.0
+                        return "Stable Diffusion Web UI - An error occurred", 0.0
                 else:
-                    return "Stable Diffusion WebUI - No image models loaded", 0.0
+                    return "Stable Diffusion Web UI - No image models loaded", 0.0
             except requests.exceptions.ConnectionError:
-                return "Stable Diffusion WebUI - Failed to retrieve model list. Is it running?", 0.0
+                return "Stable Diffusion Web UI - Failed to retrieve model list. Is it running?", 0.0
         case "swarmui":
             try:
-                # this is so API calls can be made to SwarmUI
+                # this is so API calls can be made to SwarmUI.
                 headers = {
                     "Content-Type": "application/json",
                 }
 
-                session_id: str = requests.post(f"{server_url}/API/GetNewSession", json={}, headers=headers).json()["session_id"]  # needed for making requests to the API
+                session_id: str = requests.post(f"{server_url}/API/GetNewSession", json={}, headers=headers).json()["session_id"]  # needed for making requests to the API.
                 model_ids: list[str] = []
                 model_id: str = ""
 

@@ -1,5 +1,6 @@
 from typing import Any
 from colorama import Fore
+from opengpt_types import ParamsSchema
 
 AI_MODES: list[str] = [
     "chat",
@@ -309,10 +310,67 @@ TEXT_MODEL_ATTACHMENT_AUDIO_EXTENSIONS: list[str] = [
     ".mp3",
 ]
 IMAGE_MODEL_OUTPUT_DIR_NAME: str = "image_output/"
-IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
+IMAGE_MODEL_INTERNAL_INIT_PARAMS_SCHEMA: ParamsSchema = {
+    "modelpath": {
+        "type": str,
+        "maps_to": "model_path",
+    },
+    "cliplpath": {
+        "type": str,
+        "maps_to": "clip_l_path",
+        "default_value": "",
+    },
+    "clipgpath": {
+        "type": str,
+        "maps_to": "clip_g_path",
+        "default_value": "",
+    },
+    "t5xxlpath": {
+        "type": str,
+        "maps_to": "t5xxl_path",
+        "default_value": "",
+    },
+    "vaepath": {
+        "type": str,
+        "maps_to": "vae_path",
+        "default_value": "",
+    },
+    "taesdpath": {
+        "type": str,
+        "maps_to": "taesd_path",
+        "default_value": "",
+    },
+    "loradirpath": {
+        "type": str,
+        "maps_to": "lora_model_dir",
+        "default_value": "",
+    },
+    "vaetiling": {
+        "type": bool,
+        "maps_to": "vae_tiling",
+        "default_value": False,
+    },
+    "clipcpu": {
+        "type": bool,
+        "maps_to": "keep_clip_on_cpu",
+        "default_value": False,
+    },
+    "vaecpu": {
+        "type": bool,
+        "maps_to": "keep_vae_on_cpu",
+        "default_value": False,
+    },
+    "flashattention": {
+        "type": bool,
+        "maps_to": "diffusion_flash_attn",
+        "default_value": False,
+    },
+}
+IMAGE_MODEL_GEN_PARAMS_SCHEMA: ParamsSchema = {
     "posprompt": {
         "type": str,
         "maps_to": {
+            "internal": "prompt",
             "sd_webui": "prompt",
             "swarmui": "prompt",
             "koboldcpp": "prompt",
@@ -321,6 +379,7 @@ IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
     "negprompt": {
         "type": str,
         "maps_to": {
+            "internal": "negative_prompt",
             "sd_webui": "negative_prompt",
             "swarmui": "negativeprompt",
             "koboldcpp": "negative_prompt",
@@ -330,6 +389,7 @@ IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
     "width": {
         "type": int,
         "maps_to": {
+            "internal": "width",
             "sd_webui": "width",
             "swarmui": "width",
             "koboldcpp": "width",
@@ -341,6 +401,7 @@ IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
     "height": {
         "type": int,
         "maps_to": {
+            "internal": "height",
             "sd_webui": "height",
             "swarmui": "height",
             "koboldcpp": "height",
@@ -352,6 +413,7 @@ IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
     "steps": {
         "type": int,
         "maps_to": {
+            "internal": "sample_steps",
             "sd_webui": "steps",
             "swarmui": "steps",
             "koboldcpp": "steps",
@@ -363,6 +425,7 @@ IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
     "cfgscale": {
         "type": float,
         "maps_to": {
+            "internal": "cfg_scale",
             "sd_webui": "cfg_scale",
             "swarmui": "cfgscale",
             "koboldcpp": "cfg_scale",
@@ -374,7 +437,18 @@ IMAGE_MODEL_AVAILABLE_GEN_PARAMS: dict[str, dict[str, Any]] = {
     "tiling": {
         "type": bool,
         "maps_to": {
+            "internal": None,
             "sd_webui": "tiling",
+            "swarmui": None,
+            "koboldcpp": None,
+        },
+        "default_value": False,
+    },
+    "unloadmodel": {
+        "type": bool,
+        "maps_to": {
+            "internal": "unload_model",
+            "sd_webui": None,
             "swarmui": None,
             "koboldcpp": None,
         },

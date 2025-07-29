@@ -1,4 +1,7 @@
+from typing import Any
 import os
+import re
+from opengpt_types import ParamsSchema
 import opengpt_constants
 from opengpt_gguf import GGUFParser
 
@@ -58,6 +61,79 @@ def is_text_model_valid(path: str) -> bool:
 
 def calculate_gpu_layers_for_text_model(path: str, mmproj_path: str) -> int:  # TODO: implement algorithm
     return 0
+
+
+def build_regex_pattern(params_schema: ParamsSchema, leading_text: str, kind: str) -> str:
+    """
+    Args:
+        param_schema:
+        leading_text:
+        kind:
+
+    Returns:
+        A string.
+    """
+
+    pattern: str = rf"^{leading_text}"
+    for param_name, param_info in params_schema.items():
+        real_name: str | None = param_info["maps_to"] if kind == "" else param_info["maps_to"][kind]
+        if real_name is None:
+            continue
+
+        param_pattern: str = rf"\s+(?:{param_name}=)?"
+        if param_info["type"] == str:
+            param_pattern += rf"\"(?P<{real_name}>[^\"]+)\""
+        elif param_info["type"] == bool:
+            param_pattern += rf"(?P<{real_name}>true|false)"
+        elif param_info["type"] == float:
+            param_pattern += rf"(?P<{real_name}>\d+\.\d+)"
+        elif param_info["type"] == int:
+            param_pattern += rf"(?P<{real_name}>\d+)"
+
+        if "default_value" in param_info:
+            param_pattern = rf"(?:{param_pattern})?"
+
+        pattern += param_pattern
+    pattern += r"$"
+    if leading_text == "":
+        pattern = pattern.replace(r"^\s+", r"^")  # if leading_text is empty, remove the space before the first parameter
+    return pattern
+
+
+def parse_regex_match(params_schema: ParamsSchema, match: re.Match[str], kind: str) -> dict[str, Any]:
+    """
+    Args:
+        params_schema: 
+        match: 
+        kind: 
+
+    Returns:
+        A dictionary.
+    """
+
+    provided_params: dict[str, Any] = match.groupdict()
+    for param_info in params_schema.values():
+        real_name: str | None = param_info["maps_to"] if kind == "" else param_info["maps_to"][kind]
+        if real_name is None:
+            continue
+
+        if provided_params[real_name] is None and "default_value" in param_info:
+            provided_params[real_name] = param_info["default_value"]
+
+        if type(provided_params[real_name]) == str:
+            if param_info["type"] == bool:
+                match provided_params[real_name]:
+                    case "true":
+                        provided_params[real_name] = True
+                    case "false":
+                        provided_params[real_name] = False
+                    case _:
+                        provided_params[real_name] = True if "default_value" not in param_info else param_info["default_value"]
+            elif param_info["type"] == float:
+                provided_params[real_name] = float(provided_params[real_name])
+            elif param_info["type"] == int:
+                provided_params[real_name] = int(provided_params[real_name])
+    return provided_params
 
 
 def get_file_extension(file_path: str, omit_dot: bool = False) -> str:

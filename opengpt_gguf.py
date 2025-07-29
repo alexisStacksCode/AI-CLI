@@ -1,3 +1,5 @@
+"""Written by Claude Sonnet 4!"""
+
 from typing import BinaryIO, Any
 from enum import IntEnum
 import struct
@@ -20,24 +22,24 @@ class GGUFValueType(IntEnum):
 
 class GGUFParser:
     def __init__(self, file_path: str) -> None:
-        self.file_path = file_path
-        self.metadata = {}
-        self.tensors = {}
-        self.header = {}
+        self.file_path: str = file_path
+        self.metadata: dict[str, Any] = {}
+        self.tensors: dict[str, dict[str, Any]] = {}
+        self.header: dict[str, Any] = {}
 
     def parse(self) -> dict[str, Any]:
         """Parse the GGUF file and return metadata and tensor information."""
         with open(self.file_path, "rb") as file:
-            magic = file.read(4)
+            magic: bytes = file.read(4)
             if magic != b"GGUF":
                 raise ValueError("Invalid GGUF file: magic number mismatch")
 
-            version = struct.unpack("<I", file.read(4))[0]
+            version: numpy.uint32 = struct.unpack("<I", file.read(4))[0]
             if version < 2:
                 raise ValueError(f"Unsupported GGUF version: {version}")
 
-            tensor_count = struct.unpack("<Q", file.read(8))[0]
-            metadata_count = struct.unpack("<Q", file.read(8))[0]
+            tensor_count: numpy.uint64 = struct.unpack("<Q", file.read(8))[0]
+            metadata_count: numpy.uint64 = struct.unpack("<Q", file.read(8))[0]
 
             self.header = {
                 "magic": magic.decode(),
@@ -57,7 +59,7 @@ class GGUFParser:
     @staticmethod
     def _read_string(file: BinaryIO) -> str:
         """Read a length-prefixed string."""
-        length = struct.unpack("<Q", file.read(8))[0]
+        length: Any = struct.unpack("<Q", file.read(8))[0]
         return file.read(length).decode()
 
     def _read_value(self, file: BinaryIO, value_type: int) -> Any:
@@ -91,20 +93,20 @@ class GGUFParser:
         else:
             raise ValueError(f"Unknown value type: {value_type}")
 
-    def _read_array(self, file: BinaryIO) -> list:
+    def _read_array(self, file: BinaryIO) -> list[Any]:
         """Read an array value."""
         element_type = struct.unpack("<I", file.read(4))[0]
         length = struct.unpack("<Q", file.read(8))[0]
 
-        array: list = []
+        array: list[Any] = []
         for _ in range(length):
             array.append(self._read_value(file, element_type))
 
         return array
 
-    def _read_metadata(self, file: BinaryIO, count: int) -> dict[str, Any]:
+    def _read_metadata(self, file: BinaryIO, count: numpy.uint64) -> dict[str, Any]:
         """Read metadata key-value pairs."""
-        metadata: dict = {}
+        metadata: dict[str, Any] = {}
 
         for _ in range(count):
             key: str = self._read_string(file)
@@ -114,7 +116,7 @@ class GGUFParser:
 
         return metadata
 
-    def _read_tensor_info(self, file: BinaryIO, count: int) -> dict[str, dict[str, Any]]:
+    def _read_tensor_info(self, file: BinaryIO, count: numpy.uint64) -> dict[str, dict[str, Any]]:
         """Read tensor information."""
         tensors: dict[str, dict[str, Any]] = {}
 
@@ -122,12 +124,12 @@ class GGUFParser:
             name: str = self._read_string(file)
 
             n_dimensions = struct.unpack("<I", file.read(4))[0]
-            dimensions: list = []
+            dimensions: list[numpy.uint64] = []
             for _ in range(n_dimensions):
                 dimensions.append(struct.unpack("<Q", file.read(8))[0])
 
-            tensor_type = struct.unpack("<I", file.read(4))[0]
-            offset = struct.unpack("<Q", file.read(8))[0]
+            tensor_type: numpy.uint32 = struct.unpack("<I", file.read(4))[0]
+            offset: numpy.uint64 = struct.unpack("<Q", file.read(8))[0]
 
             tensors[name] = {
                 "dims": dimensions,
@@ -145,12 +147,12 @@ class GGUFParser:
 
         tensor_info = self.tensors[tensor_name]
 
-        with open(self.file_path, "rb") as f:
+        with open(self.file_path, "rb") as file:
             # Calculate data offset (after header and tensor info).
-            f.seek(tensor_info["offset"])
+            file.seek(tensor_info["offset"])
 
             # Determine numpy dtype based on tensor type.
-            dtype_map: dict = {
+            dtype_map: dict[int, Any] = {
                 0: numpy.float32, # F32
                 1: numpy.float16, # F16
                 2: numpy.int8, # Q4_0 (simplified)
@@ -160,23 +162,6 @@ class GGUFParser:
 
             # Read and reshape data.
             total_elements = tensor_info["size"]
-            data = numpy.frombuffer(f.read(total_elements * numpy.dtype(dtype).itemsize), dtype=dtype)
+            data = numpy.frombuffer(file.read(total_elements * numpy.dtype(dtype).itemsize), dtype=dtype)
 
             return data.reshape(tensor_info["dims"])
-
-    def print_info(self):
-        """Print a summary of the GGUF file contents."""
-        print(f"GGUF File: {self.file_path}")
-        print(f"Version: {self.header["version"]}")
-        print(f"Tensors: {self.header["tensor_count"]}")
-        print(f"Metadata entries: {self.header["metadata_count"]}")
-        print("\nMetadata:")
-        for key, value in self.metadata.items():
-            if isinstance(value, list) and len(value) > 10:
-                print(f"  {key}: [list with {len(value)} items]")
-            else:
-                print(f"  {key}: {value}")
-
-        print("\nTensors:")
-        for name, info in self.tensors.items():
-            print(f"  {name}: {info["dims"]} (type: {info["type"]}, offset: {info["offset"]})")

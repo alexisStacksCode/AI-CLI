@@ -7,10 +7,9 @@ import re
 import time
 from datetime import datetime
 import requests
-import validators
 import opengpt_constants
 import opengpt_utils
-import opengpt_internet
+import opengpt_networking
 
 if __name__ == "__main__":
     settings: dict[str, Any] = {
@@ -36,36 +35,39 @@ if __name__ == "__main__":
             "context_size": 8192,
         },
         "text_model_settings": {
-            "port": 8888,
+            "port": 9001,
             "response_stream": "sse",
             "chat_show_thoughts_in_nonstreamed_responses": True,
             "chat_include_thoughts_in_context": False,
             "autocomplete_max_tokens": 128,
+            # TODO: implement generation parameters
         },
         "image_model_settings": {
-            "port": 7801,
+            "api_type": "sd_webui",
+            "port": -1,
             "open_output_on_gen": False,
         },
     }
-    text_model_server_url: str = "http://localhost:"
-    is_text_model_server_active: bool = False
+    llama_server_url: str = "http://localhost:"
+    is_llama_server_online: bool = False
     text_model_id: str = ""
-    text_model_modalities: dict[str, bool] = {
-        "vision": False,
-        "audio": False,
-    }
+    text_model_modalities: dict[str, bool] = {}
     text_model_chat_message_history: list[dict[str, Any]] = []
-    image_model_server_url: str = "http://localhost:"
+    image_gen_server_url: str = "http://localhost:"
+
+    def error_and_exit(error_message: str) -> None:
+        opengpt_utils.new_print(error_message, opengpt_constants.PRINT_COLORS["error"])
+        time.sleep(3.0)
+        exit()
 
     # noinspection PyShadowingNames
-    def append_message(role: str, content: str, attachment_path: str="") -> bool:
+    def append_message(role: str, content: str, attachment_path: str = "") -> bool:
         if role not in opengpt_constants.TEXT_MODEL_CHAT_ROLES:
             opengpt_utils.new_print(f"Cannot add messages from role '{role}' to the context", opengpt_constants.PRINT_COLORS["error"])
             return False
 
         attachment_name: str = os.path.basename(attachment_path)
         attachment_extension: str = opengpt_utils.get_file_extension(attachment_name)
-        is_attachment_url: validators.ValidationError | bool = validators.url(attachment_path)
 
         if attachment_name in opengpt_constants.TEXT_MODEL_ATTACHMENT_GENERIC_FILENAMES or attachment_extension in opengpt_constants.TEXT_MODEL_ATTACHMENT_GENERIC_EXTENSIONS:
             pass
@@ -92,7 +94,8 @@ if __name__ == "__main__":
     if os.path.exists(opengpt_constants.SETTINGS_PATH):
         try:
             with open(opengpt_constants.SETTINGS_PATH, "rt") as file:
-                new_settings: dict = json.load(file)
+                # TODO: flesh this out further
+                new_settings: dict[Any, Any] = json.load(file)
 
                 for key, value in settings.items():
                     if key in new_settings:
@@ -102,11 +105,26 @@ if __name__ == "__main__":
     with open(opengpt_constants.SETTINGS_PATH, "wt") as file:
         json.dump(settings, file, indent=4)
 
-    text_model_server_url += str(settings["text_model_settings"]["port"])
-    image_model_server_url += str(settings["image_model_settings"]["port"])
+    llama_server_url += str(settings["text_model_settings"]["port"])
+    if settings["image_model_settings"]["port"] == -1:
+        match settings["image_model_settings"]["api_type"]:
+            case "internal":
+                image_gen_server_url = ""
+            case "sd_webui":
+                image_gen_server_url += "7860"
+            case "swarmui":
+                image_gen_server_url += "7801"
+            case "koboldcpp":
+                image_gen_server_url += "5001"
+            case _:
+                error_and_exit("Failed to initialize image_gen_server_url")
+    else:
+        image_gen_server_url += str(settings["image_model_settings"]["port"])
 
     try:
-        is_text_model_server_active = opengpt_internet.get_server_status(settings["text_model_settings"]["port"])
+        is_llama_server_online = opengpt_networking.get_llama_server_status(llama_server_url)
+        if is_llama_server_online:
+            opengpt_utils.new_print("Server is online", opengpt_constants.PRINT_COLORS["success"])
     except requests.exceptions.ConnectionError:
         llama_server_path: str = f"llama.cpp/{opengpt_constants.SERVER_FILENAME}"
         if not os.path.exists(llama_server_path):
@@ -121,7 +139,7 @@ if __name__ == "__main__":
         while True:
             text_model_path: str = opengpt_utils.strip_path_quotes(input("Enter a language model path: "))
             if not opengpt_utils.is_text_model_valid(text_model_path):
-                opengpt_utils.new_print("File does not exist or is not a valid language model", opengpt_constants.PRINT_COLORS["error"])
+                opengpt_utils.new_print("File does not exist nor is a valid language model", opengpt_constants.PRINT_COLORS["error"])
                 continue
             text_model_mmproj_path: str = f"{text_model_path.removesuffix(".gguf")}-mmproj.gguf"
             if settings["server_init_settings"]["disable_mmproj"] or not os.path.exists(text_model_mmproj_path):
@@ -154,28 +172,25 @@ if __name__ == "__main__":
                     os.startfile(os.path.abspath(llama_server_path), arguments=arguments)
                 case "subprocess":
                     subprocess.Popen(f"{llama_server_path} {arguments}")
+                case _:
+                    error_and_exit("Invalid server startup behavior")
             break
 
     while True:
         try:
-            if not is_text_model_server_active:
-                is_text_model_server_active = opengpt_internet.get_server_status(settings["text_model_settings"]["port"])
+            if not is_llama_server_online:
+                is_llama_server_online = opengpt_networking.get_llama_server_status(llama_server_url)
+                if is_llama_server_online:
+                    opengpt_utils.new_print("Server is online", opengpt_constants.PRINT_COLORS["success"])
             else:
-                text_model_server_model_info_response: requests.Response = requests.get(f"{text_model_server_url}/v1/models")
-                text_model_server_properties_response: requests.Response = requests.get(f"{text_model_server_url}/props")
-                text_model_server_properties_data: dict = text_model_server_properties_response.json()
-
-                text_model_id = os.path.splitext(os.path.basename(text_model_server_model_info_response.json()["models"][0]["name"]))[0]
-                for key, value in text_model_modalities.items():
-                    if key in text_model_server_properties_data["modalities"] and text_model_server_properties_data["modalities"][key] == True:
-                        text_model_modalities[key] = True
-                opengpt_utils.new_print(f"Running {text_model_id} (Vision: {text_model_modalities["vision"]}, Audio: {text_model_modalities["audio"]})\n", opengpt_constants.PRINT_COLORS["success"])
+                text_model_id, text_model_modalities = opengpt_networking.get_llama_server_info(llama_server_url)
+                opengpt_utils.new_print(f"You are served by: {text_model_id}", opengpt_constants.PRINT_COLORS["success"])
                 break
         except requests.exceptions.ConnectionError:
-            opengpt_utils.new_print("An error occurred while connecting to the server", opengpt_constants.PRINT_COLORS["error"])
-            time.sleep(3.0)
-            exit()
+            error_and_exit("An error occurred while connecting to the server")
 
+    opengpt_utils.new_print(f"\n{settings["mode"].capitalize()} Mode", opengpt_constants.PRINT_COLORS["special"])
+    opengpt_utils.new_print("/help to see all commands.\n", opengpt_constants.PRINT_COLORS["special"])
     while True:
         match settings["mode"]:
             case "chat":
@@ -183,99 +198,13 @@ if __name__ == "__main__":
                 command: str = user_message.strip()
 
                 if command.startswith(opengpt_constants.COMMAND_IMAGE_ALIAS):
-                    try:
-                        available_gen_params = opengpt_constants.IMAGE_MODEL_AVAILABLE_GEN_PARAMS.items()
+                    pattern: str = opengpt_utils.build_regex_pattern(opengpt_constants.IMAGE_MODEL_GEN_PARAMS_SCHEMA, opengpt_constants.COMMAND_IMAGE_ALIAS, settings["image_model_settings"]["api_type"])
 
-                        pattern: str = rf"^{opengpt_constants.COMMAND_IMAGE_ALIAS}"
-                        for gen_param_name, gen_param_info in available_gen_params:
-                            gen_param_pattern: str = rf"\s+(?:{gen_param_name}=)?"
-                            if gen_param_info["type"] == str:
-                                gen_param_pattern += rf"\"(?P<{gen_param_info["maps_to"]}>[^\"]+)\""
-                            elif gen_param_info["type"] == bool:
-                                gen_param_pattern += rf"(?P<{gen_param_info["maps_to"]}>true|false)"
-                            elif gen_param_info["type"] == float:
-                                gen_param_pattern += rf"(?P<{gen_param_info["maps_to"]}>\d+\.\d+)"
-                            elif gen_param_info["type"] == int:
-                                gen_param_pattern += rf"(?P<{gen_param_info["maps_to"]}>\d+)"
-
-                            if "default_value" in gen_param_info:
-                                gen_param_pattern = rf"(?:{gen_param_pattern})?"
-
-                            pattern += gen_param_pattern
-                        pattern += r"$"
-
-                        match: re.Match[str] | None = re.match(pattern, command)
-                        if match:
-                            headers: dict[str, str] = {
-                                "Content-Type": "application/json",
-                            }
-                            image_model_session_response: requests.Response = requests.post(f"{image_model_server_url}/API/GetNewSession", json={}, headers=headers)
-                            image_model_session_id: str = image_model_session_response.json()["session_id"]
-                            image_model_list_response: requests.Response = requests.post(f"{image_model_server_url}/API/ListLoadedModels", json={"session_id": image_model_session_id}, headers=headers)
-                            image_model_list: list = image_model_list_response.json()["models"]
-                            image_model_id: str = ""
-
-                            if len(image_model_list) == 0:
-                                opengpt_utils.new_print("SwarmUI: No image models are loaded", opengpt_constants.PRINT_COLORS["error"])
-                                continue
-                            elif len(image_model_list) == 1:
-                                image_model_id = image_model_list[0]["name"]
-                            elif len(image_model_list) >= 2:
-                                pass # TODO: provide the user with an option to select an image model if more than one is loaded
-
-                            gen_params: dict[str, Any] = match.groupdict()
-                            can_generate: bool = True
-                            for gen_param_name, gen_param_info in available_gen_params:
-                                real_name: str = gen_param_info["maps_to"]
-
-                                if gen_params[real_name] is None and "default_value" in gen_param_info:
-                                    gen_params[real_name] = gen_param_info["default_value"]
-
-                                if type(gen_params[real_name]) == str:
-                                    if gen_param_info["type"] == bool:
-                                        match gen_params[real_name]:
-                                            case "true":
-                                                gen_params[real_name] = True
-                                            case "false":
-                                                gen_params[real_name] = False
-                                            case _: # This should never happen.
-                                                gen_params[real_name] = True if "default_value" not in gen_param_info else gen_param_info["default_value"]
-                                    elif gen_param_info["type"] == float:
-                                        gen_params[real_name] = float(gen_params[real_name])
-                                    elif gen_param_info["type"] == int:
-                                        gen_params[real_name] = int(gen_params[real_name])
-
-                                if gen_param_info["type"] == str and "values" in gen_param_info and gen_params[real_name] not in gen_param_info["values"]:
-                                    available_values: str = ""
-                                    for index in range(len(gen_param_info["values"])):
-                                        available_values += f"{gen_param_info["values"][index]}{", " if index != len(gen_param_info["values"]) - 1 else ""}"
-
-                                    can_generate = False
-                                    opengpt_utils.new_print(f"Invalid value passed to {gen_param_name} (values: {available_values})", opengpt_constants.PRINT_COLORS["error"])
-                                    break
-                                elif (gen_param_info["type"] == float or gen_param_info["type"] == int) and "min_value" in gen_param_info and "max_value" in gen_param_info and (gen_params[real_name] < gen_param_info["min_value"] or gen_params[real_name] > gen_param_info["max_value"]):
-                                    can_generate = False
-                                    opengpt_utils.new_print(f"Invalid value passed to {gen_param_name} (min. value: {gen_param_info["min_value"]}, max. value: {gen_param_info["max_value"]})", opengpt_constants.PRINT_COLORS["error"])
-                                    break
-
-                            if not can_generate:
-                                continue
-
-                            payload: dict[str, Any] = {
-                                "session_id": image_model_session_id,
-                                "model": image_model_id,
-                                "images": 1,
-                                "donotsave": True,
-                                "seed": -1,
-                            }
-                            for key, value in gen_params.items():
-                                payload[key] = value
-                            image_model_gen_start_time: float = time.time()
-                            opengpt_utils.new_print("Generating...", opengpt_constants.PRINT_COLORS["success"])
-                            image_model_gen_response: requests.Response = requests.post(f"{image_model_server_url}/API/GenerateText2Image", json=payload, headers=headers)
-                            image_model_gen_data: str = image_model_gen_response.json()["images"][0]
-
-                            # Ensure that the image output directory exists.
+                    match: re.Match[str] | None = re.match(pattern, command)
+                    if match is not None:
+                        result, gen_time = opengpt_networking.generate_image(settings["image_model_settings"]["api_type"], image_gen_server_url, match)
+                        if type(result) == dict:
+                            # ensure that the image output directory exists
                             try:
                                 os.mkdir(opengpt_constants.IMAGE_MODEL_OUTPUT_DIR_NAME)
                             except FileExistsError:
@@ -283,27 +212,25 @@ if __name__ == "__main__":
 
                             image_output_path: str = f"{opengpt_constants.IMAGE_MODEL_OUTPUT_DIR_NAME}{datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")}.png"
                             with open(image_output_path, "wb") as file:
-                                file.write(base64.b64decode(image_model_gen_data.removeprefix("data:image/png;base64,")))
+                                file.write(base64.b64decode(result["image"].removeprefix("data:image/png;base64,")))
                             if settings["image_model_settings"]["open_output_on_gen"]:
                                 os.startfile(os.path.abspath(image_output_path))
 
-                            model_message: str = f"Generated in {"{:.2f}".format(time.time() - image_model_gen_start_time)} seconds."
-                            if not text_model_modalities["vision"]:
+                            model_message: str = f"Generated in {"{:.2f}".format(gen_time)} seconds."
+                            if not text_model_modalities.get("vision", False):
                                 print(f"\n{opengpt_utils.colorize_text("MODEL: ", opengpt_constants.PRINT_COLORS["model_prefix"])}{model_message} This message won't be added to the context as I cannot see images.\n")
-                            else: # TODO: work on this after message sending is fully implemented
-                                pass
-                        else:
-                            opengpt_utils.new_print("Usage: /image posprompt=\"woman, high quality, 4k\" negprompt=\"bad quality\" width=512 height=512 steps=20 cfgscale=5.0", opengpt_constants.PRINT_COLORS["special"])
-                    except requests.exceptions.ConnectionError:
-                        opengpt_utils.new_print("SwarmUI: Not running", opengpt_constants.PRINT_COLORS["error"])
+                        elif type(result) == str:
+                            opengpt_utils.new_print(result, opengpt_constants.PRINT_COLORS["error"])
                 elif command == opengpt_constants.COMMAND_HELP_ALIAS:
-                    pass
+                    opengpt_utils.new_print("/image ", opengpt_constants.PRINT_COLORS["special"])
                 elif command == opengpt_constants.COMMAND_EXIT_ALIAS:
                     exit()
                 else:
-                    command_match: re.Match[str] | None = re.match(rf"^(?P<text>.+?)?(?P<command_start>(?:\s+)?/attach)(?P<command_end>\s+\"(?P<path>[^\"]+)\")?$", user_message)
-                    if command_match:
-                        pass
+                    command_attach_match: re.Match[str] | None = re.fullmatch(rf"(?P<command>(?:\s+)?{opengpt_constants.COMMAND_ATTACH_ALIAS}\s+\"(?P<path>[^\"]+)\")?", user_message)
+                    if command_attach_match:
+                        print(command_attach_match.groupdict())
+                    print(user_message)
+                    continue
 
                     if append_message("user", user_message):
                         payload: dict[str, Any] = {
@@ -313,7 +240,7 @@ if __name__ == "__main__":
                         }
 
                         opengpt_utils.new_print(f"\nMODEL: ", opengpt_constants.PRINT_COLORS["model_prefix"], "")
-                        chat_response: requests.Response = requests.post(f"{text_model_server_url}/v1/chat/completions", json=payload, stream=payload["stream"])
+                        chat_response: requests.Response = requests.post(f"{llama_server_url}/v1/chat/completions", json=payload, stream=payload["stream"])
                         if not payload["stream"]:
                             chat_response_data: dict = chat_response.json()
                             if append_message("assistant", refine_message(chat_response_data["choices"][0]["message"]["content"], settings["text_model_settings"]["chat_include_thoughts_in_context"])):
@@ -338,4 +265,6 @@ if __name__ == "__main__":
                     else:
                         opengpt_utils.new_print("Cannot send empty messages", opengpt_constants.PRINT_COLORS["error"])
             case "autocomplete":
-                prompt: str = input(f"{opengpt_constants.PRINT_COLORS["user_prefix"]}> {opengpt_constants.PRINT_COLORS["reset"]}")
+                prompt: str = input(opengpt_utils.colorize_text("> ", opengpt_constants.PRINT_COLORS["user_prefix"]))
+            case _:
+                error_and_exit("")
