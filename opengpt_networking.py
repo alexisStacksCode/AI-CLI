@@ -130,8 +130,18 @@ def generate_image(api_type: str, server_url: str, gen_params: dict[str, Any]) -
                 elif len(model_ids) == 1:
                     model_id = model_ids[0]
                 elif len(model_ids) >= 2:
-                    # TODO: present the user with an option to select an image model
-                    return "TODO", 0.0
+                    try:
+                        chosen_model_id_index: int = int(input(f"Multiple image models are available, choose one (1-{len(model_ids)}): "))
+
+                        # noinspection PyChainedComparisons
+                        if chosen_model_id_index >= 1 and chosen_model_id_index <= len(model_ids):
+                            model_id = model_ids[chosen_model_id_index - 1]
+                        else:
+                            model_id = model_ids[0]
+                            opengpt_utils.new_print("Got invalid index, defaulting to 1", opengpt_constants.PRINT_COLORS["warning"])
+                    except ValueError:
+                        model_id = model_ids[0]
+                        opengpt_utils.new_print("Error while converting input to int, defaulting to 1", opengpt_constants.PRINT_COLORS["warning"])
 
                 try:
                     payload["session_id"] = session_id
