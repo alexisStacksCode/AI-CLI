@@ -1,12 +1,10 @@
-from typing import Any
-from colorama import Fore
 from opengpt_types import ParamsSchema
+from colorama import Fore
 
-AI_MODES: list[str] = [
-    "chat",
-    "autocomplete",
-]
-SETTINGS_PATH: str = "data/settings.json"
+VERSION: str = "2.0.0-dev"
+SETTINGS_PATH: str = "settings.json"
+CHAT_SYSTEM_PROMPT_PATH: str = "chat_system_prompt.txt"
+IMAGE_OUTPUT_DIR_NAME: str = "image_output/"
 SERVER_FILENAME: str = "llama-server.exe"
 PRINT_COLORS: dict[str, str] = {
     "reset": Fore.RESET,
@@ -17,8 +15,6 @@ PRINT_COLORS: dict[str, str] = {
     "warning": Fore.LIGHTYELLOW_EX,
     "error": Fore.LIGHTRED_EX,
 }
-TEXT_MODEL_EXTENSION: str = ".gguf"
-TEXT_MODEL_CHAT_SYSTEM_PROMPT_PATH: str = "data/chat_system_prompt.txt"
 TEXT_MODEL_KV_CACHE_DATA_TYPES: list[str] = [
     "f32",
     "f16",
@@ -29,11 +25,6 @@ TEXT_MODEL_KV_CACHE_DATA_TYPES: list[str] = [
     "iq4_nl",
     "q5_0",
     "q5_1",
-]
-TEXT_MODEL_CHAT_ROLES: list[str] = [
-    "system",
-    "user",
-    "assistant",
 ]
 TEXT_MODEL_ATTACHMENT_GENERIC_URL_PATTERNS: list[str] = [
     r"https://github\.com/[^/]+/[^/]+/raw/",
@@ -309,63 +300,6 @@ TEXT_MODEL_ATTACHMENT_AUDIO_EXTENSIONS: list[str] = [
     ".wav",
     ".mp3",
 ]
-IMAGE_MODEL_OUTPUT_DIR_NAME: str = "image_output/"
-IMAGE_MODEL_INTERNAL_INIT_PARAMS_SCHEMA: ParamsSchema = {
-    "modelpath": {
-        "type": str,
-        "maps_to": "model_path",
-    },
-    "cliplpath": {
-        "type": str,
-        "maps_to": "clip_l_path",
-        "default_value": "",
-    },
-    "clipgpath": {
-        "type": str,
-        "maps_to": "clip_g_path",
-        "default_value": "",
-    },
-    "t5xxlpath": {
-        "type": str,
-        "maps_to": "t5xxl_path",
-        "default_value": "",
-    },
-    "vaepath": {
-        "type": str,
-        "maps_to": "vae_path",
-        "default_value": "",
-    },
-    "taesdpath": {
-        "type": str,
-        "maps_to": "taesd_path",
-        "default_value": "",
-    },
-    "loradirpath": {
-        "type": str,
-        "maps_to": "lora_model_dir",
-        "default_value": "",
-    },
-    "vaetiling": {
-        "type": bool,
-        "maps_to": "vae_tiling",
-        "default_value": False,
-    },
-    "clipcpu": {
-        "type": bool,
-        "maps_to": "keep_clip_on_cpu",
-        "default_value": False,
-    },
-    "vaecpu": {
-        "type": bool,
-        "maps_to": "keep_vae_on_cpu",
-        "default_value": False,
-    },
-    "flashattention": {
-        "type": bool,
-        "maps_to": "diffusion_flash_attn",
-        "default_value": False,
-    },
-}
 IMAGE_MODEL_GEN_PARAMS_SCHEMA: ParamsSchema = {
     "posprompt": {
         "type": str,
@@ -419,7 +353,7 @@ IMAGE_MODEL_GEN_PARAMS_SCHEMA: ParamsSchema = {
             "koboldcpp": "steps",
         },
         "default_value": 20,
-        "min_value": 0,
+        "min_value": 1,
         "max_value": 100,
     },
     "cfgscale": {
@@ -452,6 +386,70 @@ IMAGE_MODEL_GEN_PARAMS_SCHEMA: ParamsSchema = {
             "swarmui": None,
             "koboldcpp": None,
         },
+        "default_value": False,
+    },
+}
+IMAGE_MODEL_INTERNAL_INIT_PARAMS_SCHEMA: ParamsSchema = {
+    "modelpath": {
+        "type": str,
+        "maps_to": "model_path",
+    },
+    "modeltype": {
+        "type": str,
+        "maps_to": "model_type",
+        "values": [
+            "sd",
+            "flux",
+        ],
+    },
+    "cliplpath": {
+        "type": str,
+        "maps_to": "clip_l_path",
+        "default_value": "",
+    },
+    "clipgpath": {
+        "type": str,
+        "maps_to": "clip_g_path",
+        "default_value": "",
+    },
+    "t5xxlpath": {
+        "type": str,
+        "maps_to": "t5xxl_path",
+        "default_value": "",
+    },
+    "vaepath": {
+        "type": str,
+        "maps_to": "vae_path",
+        "default_value": "",
+    },
+    "taesdpath": {
+        "type": str,
+        "maps_to": "taesd_path",
+        "default_value": "",
+    },
+    "loradirpath": {
+        "type": str,
+        "maps_to": "lora_model_dir",
+        "default_value": "",
+    },
+    "vaetiling": {
+        "type": bool,
+        "maps_to": "vae_tiling",
+        "default_value": False,
+    },
+    "clipcpu": {
+        "type": bool,
+        "maps_to": "keep_clip_on_cpu",
+        "default_value": False,
+    },
+    "vaecpu": {
+        "type": bool,
+        "maps_to": "keep_vae_on_cpu",
+        "default_value": False,
+    },
+    "flashattention": {
+        "type": bool,
+        "maps_to": "diffusion_flash_attn",
         "default_value": False,
     },
 }
