@@ -1,15 +1,15 @@
 from typing import Any
+import opengpt_constants
+import opengpt_utils
+import opengpt_networking
 import os
 import subprocess
 import json
 import base64
 import re
+import datetime
 import time
-from datetime import datetime
 import requests
-import opengpt_constants
-import opengpt_utils
-import opengpt_networking
 
 if __name__ == "__main__":
     settings: dict[str, Any] = {
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     llama_server_url: str = "http://localhost:"
     is_llama_server_online: bool = False
     text_model_id: str = ""
-    text_model_modalities: dict[str, bool] = {}
+    text_model_modalities: dict[str, Any] = {}
     text_model_chat_message_history: list[dict[str, Any]] = []
     image_gen_server_url: str = "http://localhost:"
 
@@ -94,7 +94,6 @@ if __name__ == "__main__":
     if os.path.exists(opengpt_constants.SETTINGS_PATH):
         try:
             with open(opengpt_constants.SETTINGS_PATH, "rt") as file:
-                # TODO: flesh this out further
                 new_settings: dict[Any, Any] = json.load(file)
 
                 for key, value in settings.items():
@@ -106,10 +105,15 @@ if __name__ == "__main__":
         json.dump(settings, file, indent=4)
 
     llama_server_url += str(settings["text_model_settings"]["port"])
+    if settings["image_model_settings"]["api_type"] == "internal":
+        try:
+            import stable_diffusion_cpp # type: ignore
+        except ImportError:
+            error_and_exit("image_model_settings.api_type is set to 'internal' but Python module 'stable-diffusion-cpp-python' is not installed")
     if settings["image_model_settings"]["port"] == -1:
         match settings["image_model_settings"]["api_type"]:
             case "internal":
-                image_gen_server_url = ""
+                pass
             case "sd_webui":
                 image_gen_server_url += "7860"
             case "swarmui":
@@ -117,7 +121,7 @@ if __name__ == "__main__":
             case "koboldcpp":
                 image_gen_server_url += "5001"
             case _:
-                error_and_exit("Failed to initialize image_gen_server_url")
+                error_and_exit("Failed to initialize image_gen_server_url with default port")
     else:
         image_gen_server_url += str(settings["image_model_settings"]["port"])
 
@@ -138,7 +142,7 @@ if __name__ == "__main__":
 
         while True:
             text_model_path: str = opengpt_utils.strip_path_quotes(input("Enter a language model path: "))
-            if not opengpt_utils.is_text_model_valid(text_model_path):
+            if not opengpt_utils.is_valid_text_model(text_model_path):
                 opengpt_utils.new_print("File does not exist nor is a valid language model", opengpt_constants.PRINT_COLORS["error"])
                 continue
             text_model_mmproj_path: str = f"{text_model_path.removesuffix(".gguf")}-mmproj.gguf"
@@ -162,6 +166,7 @@ if __name__ == "__main__":
                 f"--cache-type-v {settings["server_init_settings"]["kv_cache_data_type_v"]}",
                 f"--defrag-thold {settings["server_init_settings"]["kv_cache_defragmentation_threshold"]}",
                 f"--cache-reuse {settings["server_init_settings"]["kv_cache_reuse_size"]}",
+                "--no-context-shift" if not settings["server_init_settings"]["use_context_shift"] else "",
                 f"--ctx-size {settings["server_init_settings"]["context_size"]}",
                 "--keep -1",
                 f"--model \"{text_model_path}\"",
@@ -198,13 +203,13 @@ if __name__ == "__main__":
                 command: str = user_message.strip()
 
                 if command.startswith(opengpt_constants.COMMAND_IMAGE_ALIAS):
-                    pattern: str = opengpt_utils.build_regex_pattern(opengpt_constants.IMAGE_MODEL_GEN_PARAMS_SCHEMA, opengpt_constants.COMMAND_IMAGE_ALIAS, settings["image_model_settings"]["api_type"])
+                    pattern: str = opengpt_utils.build_params_regex_pattern(opengpt_constants.IMAGE_MODEL_GEN_PARAMS_SCHEMA, opengpt_constants.COMMAND_IMAGE_ALIAS, settings["image_model_settings"]["api_type"])
 
                     match: re.Match[str] | None = re.match(pattern, command)
                     if match is not None:
                         result, gen_time = opengpt_networking.generate_image(settings["image_model_settings"]["api_type"], image_gen_server_url, match)
                         if type(result) == dict:
-                            # ensure that the image output directory exists
+                            # ensure that the image output directory exists.
                             try:
                                 os.mkdir(opengpt_constants.IMAGE_MODEL_OUTPUT_DIR_NAME)
                             except FileExistsError:
@@ -229,8 +234,6 @@ if __name__ == "__main__":
                     command_attach_match: re.Match[str] | None = re.fullmatch(rf"(?P<command>(?:\s+)?{opengpt_constants.COMMAND_ATTACH_ALIAS}\s+\"(?P<path>[^\"]+)\")?", user_message)
                     if command_attach_match:
                         print(command_attach_match.groupdict())
-                    print(user_message)
-                    continue
 
                     if append_message("user", user_message):
                         payload: dict[str, Any] = {
