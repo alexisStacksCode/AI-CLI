@@ -1,10 +1,9 @@
 from typing import Any
-import os
-import re
 from opengpt_types import ParamsSchema
 import opengpt_constants
 from opengpt_gguf import GGUFParser
-
+import os
+import re
 
 def new_print(text: str, color: str, end: str = "\n") -> None:
     """
@@ -17,7 +16,6 @@ def new_print(text: str, color: str, end: str = "\n") -> None:
     """
 
     print(colorize_text(text, color), end=end)
-
 
 def colorize_text(text: str, color: str) -> str:
     """
@@ -33,9 +31,8 @@ def colorize_text(text: str, color: str) -> str:
 
     return f"{color}{text}{opengpt_constants.PRINT_COLORS["reset"]}"
 
-
-def is_text_model_valid(path: str) -> bool:
-    if not os.path.exists(path) or get_file_extension(path) != opengpt_constants.TEXT_MODEL_EXTENSION:
+def is_valid_text_model(path: str) -> bool:
+    if not os.path.exists(path) or get_file_extension(path) != ".gguf":
         return False
 
     try:
@@ -58,15 +55,13 @@ def is_text_model_valid(path: str) -> bool:
     except:
         return False
 
-
 def calculate_gpu_layers_for_text_model(path: str, mmproj_path: str) -> int:  # TODO: implement algorithm
     return 0
 
-
-def build_regex_pattern(params_schema: ParamsSchema, leading_text: str, kind: str) -> str:
+def build_params_regex_pattern(params_schema: ParamsSchema, leading_text: str, kind: str) -> str:
     """
     Args:
-        param_schema:
+        params_schema:
         leading_text:
         kind:
 
@@ -96,11 +91,11 @@ def build_regex_pattern(params_schema: ParamsSchema, leading_text: str, kind: st
         pattern += param_pattern
     pattern += r"$"
     if leading_text == "":
-        pattern = pattern.replace(r"^\s+", r"^")  # if leading_text is empty, remove the space before the first parameter
+        pattern = pattern.replace(r"^\s+", r"^") # if leading_text is empty, remove the space before the first parameter.
     return pattern
 
 
-def parse_regex_match(params_schema: ParamsSchema, match: re.Match[str], kind: str) -> dict[str, Any]:
+def parse_params_regex_match(params_schema: ParamsSchema, match: re.Match[str], kind: str) -> dict[str, Any]:
     """
     Args:
         params_schema: 
