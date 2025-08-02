@@ -1,4 +1,5 @@
 from typing import Any
+import os
 
 from modules.core.enums import PrintColors
 from modules import global_vars, utils, lm_backend, im_backend
@@ -17,7 +18,12 @@ def loop(mode: str) -> None:
 def _mode_chat() -> None:
     message_history: lm_backend.MessageHistory = lm_backend.MessageHistory()
 
-    message_history.add("system", "You are a helpful assistant.")
+    if os.path.exists("data/chat_system_prompt.txt"):
+        try:
+            with open("data/chat_system_prompt.txt", "rt") as file:
+                message_history.add("system", file.read())
+        except UnicodeDecodeError:
+            utils.terminal.new_print("Malformed system prompt file", PrintColors.WARNING)
     while True:
         user_message: str = input(utils.terminal.colorize_text("\nUSER: ", PrintColors.USER_TURN))
         if message_history.add("user", user_message):
