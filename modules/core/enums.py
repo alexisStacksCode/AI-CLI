@@ -1,4 +1,4 @@
-from enum import StrEnum, IntEnum
+from enum import StrEnum
 
 from colorama import Fore
 
@@ -12,6 +12,6 @@ class PrintColors(StrEnum):
     ERROR = Fore.LIGHTRED_EX
 
 
-class ModelResponsePrintBehavior(IntEnum):
-    SSE = 0
-    TYPEWRITER = 1
+class ModelResponsePrintBehavior(StrEnum):
+    SSE = "sse"
+    TYPEWRITER = "typewriter"
