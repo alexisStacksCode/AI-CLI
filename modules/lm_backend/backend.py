@@ -1,3 +1,5 @@
+import re
+
 from modules.core.types import MessageList
 from modules import global_vars
 from .interfaces import TextModelInterface, LlamaInterface, LlamaServerInterface
@@ -33,3 +35,13 @@ def init_interface(interface: str) -> None:
                 global_vars.text_model_interface = LlamaServerInterface("http://localhost:8080")
             case _:
                 raise ValueError
+
+
+def refine_message(text: str, keep_thoughts: bool) -> str:
+    if keep_thoughts or ("<think>" not in text and "</think>" not in text):
+        return text
+
+    text_buffer: str = ""
+    for match in re.findall(r"(<think>.*?</think>\n*)(.*?)(?=<think>|$)", text, re.DOTALL):
+        text_buffer += match[1]
+    return text_buffer
