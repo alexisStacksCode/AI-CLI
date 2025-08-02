@@ -2,6 +2,7 @@ from typing import Any
 import os
 import re
 
+
 def build_params_regex(param_schema: dict[str, dict[str, Any]], leading_text: str, kind: str) -> str:
     pattern: str = rf"^{leading_text}"
     for param_name, param_info in param_schema.items():
@@ -25,8 +26,9 @@ def build_params_regex(param_schema: dict[str, dict[str, Any]], leading_text: st
         pattern += param_pattern
     pattern += r"$"
     if leading_text == "":
-        pattern = pattern.replace(r"^\s+", r"^") # If leading_text is empty, remove the space before the first parameter.
+        pattern = pattern.replace(r"^\s+", r"^")  # If leading_text is empty, remove the space before the first parameter.
     return pattern
+
 
 def parse_params_regex(param_schema: dict[str, dict[str, Any]], regex_match: re.Match[str], kind: str) -> dict[str, Any]:
     extracted_params: dict[str, Any] = regex_match.groupdict()
@@ -54,6 +56,7 @@ def parse_params_regex(param_schema: dict[str, dict[str, Any]], regex_match: re.
                 extracted_params[real_name] = int(extracted_params[real_name])
     return extracted_params
 
+
 def build_argument_string(arguments: list[str]) -> str:
     argument_string: str = ""
     for index in range(len(arguments)):
@@ -62,12 +65,15 @@ def build_argument_string(arguments: list[str]) -> str:
             argument_string += f"{arguments[index]}{" " if index != len(arguments) - 1 else ""}"
     return argument_string
 
+
 def get_file_extension(file_path: str, omit_dot: bool = False) -> str:
     file_extension: str = os.path.splitext(file_path)[1]
     return file_extension if not omit_dot else file_extension[1:]
 
+
 def get_filename_without_extension(file_path: str) -> str:
     return os.path.splitext(os.path.basename(file_path))[0]
+
 
 def strip_path_quotes(file_path: str) -> str:
     return file_path.removeprefix("\"").removesuffix("\"")

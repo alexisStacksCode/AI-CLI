@@ -1,5 +1,7 @@
-from enum import StrEnum
+from enum import StrEnum, IntEnum
+
 from colorama import Fore
+
 
 class PrintColors(StrEnum):
     SPECIAL = Fore.LIGHTCYAN_EX
@@ -8,3 +10,8 @@ class PrintColors(StrEnum):
     SUCCESS = Fore.LIGHTGREEN_EX
     WARNING = Fore.LIGHTYELLOW_EX
     ERROR = Fore.LIGHTRED_EX
+
+
+class ModelResponsePrintBehavior(IntEnum):
+    SSE = 0
+    TYPEWRITER = 1

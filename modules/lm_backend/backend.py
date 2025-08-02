@@ -1,10 +1,11 @@
-from typing import Any
+from modules.core.types import MessageList
 from modules import global_vars
 from .interfaces import TextModelInterface, LlamaInterface, LlamaServerInterface
 
+
 class MessageHistory:
     def __init__(self) -> None:
-        self.__list: list[Any] = []
+        self.__list: MessageList = []
 
     def add(self, role: str, content: str) -> bool:
         if role not in ["system", "user", "assistant"]:
@@ -19,8 +20,9 @@ class MessageHistory:
         })
         return True
 
-    def get(self) -> list[Any]:
+    def get(self) -> MessageList:
         return self.__list
+
 
 def init_interface(interface: str) -> None:
     if type(global_vars.text_model_interface) == TextModelInterface:

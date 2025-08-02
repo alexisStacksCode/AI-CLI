@@ -1,5 +1,6 @@
 import argparse
 
+
 def get() -> argparse.Namespace:
     argument_parser: argparse.ArgumentParser = argparse.ArgumentParser()
     argument_parser.add_argument("--model")

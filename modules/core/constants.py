@@ -1,5 +1,6 @@
 from typing import Any
 
+
 VERSION: str = "2.0.0-dev2"
 IMAGE_MODEL_GEN_PARAMS_SCHEMA: dict[str, dict[str, Any]] = {
     "posprompt": {

@@ -4,11 +4,14 @@ import io
 import base64
 import re
 import time
+
 import requests
+
 from modules.core.types import ImageGenResult
 from modules.core.enums import PrintColors
 from modules.core import constants
 from modules import utils
+
 
 # TODO: update this
 class ImageModelInterface:

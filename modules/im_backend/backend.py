@@ -1,6 +1,7 @@
 from modules import global_vars
 from .interfaces import ImageModelInterface, SDCppInterface, KoboldCppInterface, SDWebUIInterface, SwarmUIInterface
 
+
 def init_interface(interface: str) -> None:
     if type(global_vars.image_model_interface) == ImageModelInterface:
         match interface:
