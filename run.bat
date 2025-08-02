@@ -1,0 +1,1 @@
+python main.py --model "../text_models/qwen3-4b.gguf" --lm-backend llama_server --mode chat

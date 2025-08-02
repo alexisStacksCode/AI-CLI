@@ -1,8 +1,9 @@
 # OpenGPT-CLI
 settings.json
 image_output/
-llama.cpp/
+server/
 *.gguf
+*.safetensors
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
