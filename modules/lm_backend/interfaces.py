@@ -1,12 +1,10 @@
 from typing import Any
 import os
 import json
-import random
 import time
 
 from colorama import Fore
 import requests
-import llama_cpp
 
 from modules.core.types import MessageList
 from modules.core.enums import PrintColors, ModelResponsePrintBehavior
@@ -65,48 +63,6 @@ class TextModelInterface:
                     raise ValueError
             return text
         return ""
-
-
-class LlamaInterface(TextModelInterface):
-    def launch(self, model_path: str) -> None:
-        model_path = TextModelInterface._prompt_for_model_path_if_nonexistent(model_path)
-        self._model = llama_cpp.Llama(model_path, n_gpu_layers=99, n_ctx=2048, n_batch=2048, n_ubatch=2048, verbose=False)
-
-    def create_chat_completion(self, messages: MessageList, **kwargs: Any) -> Any:
-        # As of llama-cpp-python v0.3.14, random seeds don't work properly.
-        kwargs["seed"] = random.randint(0, 2 ** 32)
-
-        return self._model.create_chat_completion(messages, **kwargs)
-
-    def consume_chat_completion_response(self, response: Any) -> str:
-        try:
-            # Check if the response is a stream.
-            iter(response)
-
-            text_buffer: str = ""
-            for chunk_text in response:
-                text_buffer += TextModelInterface._build_text_stream(chunk_text["choices"][0]["delta"].get("content", ""), ModelResponsePrintBehavior.TYPEWRITER)
-            return text_buffer
-        except TypeError:
-            return TextModelInterface._build_text_nonstream(response["choices"][0]["message"]["content"])
-
-    def create_text_completion(self, prompt: str, **kwargs: Any) -> Any:
-        # As of llama-cpp-python v0.3.14, random seeds don't work properly.
-        kwargs["seed"] = random.randint(0, 2 ** 32)
-
-        return self._model.create_completion(prompt, **kwargs)
-
-    def consume_text_completion_response(self, response: Any) -> str:
-        try:
-            # Check if the response is a stream.
-            iter(response)
-
-            text_buffer: str = ""
-            for chunk_text in response:
-                text_buffer += TextModelInterface._build_text_stream(chunk_text["choices"][0]["text"], ModelResponsePrintBehavior.TYPEWRITER)
-            return text_buffer
-        except TypeError:
-            return TextModelInterface._build_text_nonstream(response["choices"][0]["text"])
 
 
 class LlamaServerInterface(TextModelInterface):

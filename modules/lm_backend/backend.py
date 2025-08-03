@@ -2,7 +2,7 @@ import re
 
 from modules.core.types import MessageList
 from modules import global_vars
-from .interfaces import TextModelInterface, LlamaInterface, LlamaServerInterface
+from .interfaces import TextModelInterface, LlamaServerInterface
 
 
 class MessageHistory:
@@ -29,8 +29,6 @@ class MessageHistory:
 def init_interface(interface: str) -> None:
     if type(global_vars.text_model_interface) == TextModelInterface:
         match interface:
-            case "internal":
-                global_vars.text_model_interface = LlamaInterface("")
             case "llama_server":
                 global_vars.text_model_interface = LlamaServerInterface("http://localhost:8080")
             case _:
