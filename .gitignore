@@ -1,7 +1,7 @@
 # OpenGPT-CLI
 settings.json
 image_output/
-server/
+servers/
 *.gguf
 *.safetensors
 
