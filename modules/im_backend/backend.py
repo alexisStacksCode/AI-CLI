@@ -1,3 +1,4 @@
+from modules.core import settings
 from .interfaces import ImageModelInterface, SDCppInterface, KoboldCppInterface, SDWebUIInterface, SwarmUIInterface
 
 
@@ -12,10 +13,15 @@ def init_interface(interface_name: str) -> None:
             case "internal":
                 interface = SDCppInterface("", "", "prompt", "negative_prompt")
             case "koboldcpp":
-                interface = KoboldCppInterface("http://localhost:5001", "/sdapi/v1/txt2img", "prompt", "negative_prompt")
+                interface = KoboldCppInterface(f"http://localhost:{__get_port(5001)}", "/sdapi/v1/txt2img", "prompt", "negative_prompt")
             case "sd_webui":
-                interface = SDWebUIInterface("http://localhost:7860", "/sdapi/v1/txt2img", "prompt", "negative_prompt")
+                interface = SDWebUIInterface(f"http://localhost:{__get_port(7860)}", "/sdapi/v1/txt2img", "prompt", "negative_prompt")
             case "swarmui":
-                interface = SwarmUIInterface("http://localhost:7801", "/API/GenerateText2Image", "prompt", "negativeprompt")
+                interface = SwarmUIInterface(f"http://localhost:{__get_port(7801)}", "/API/GenerateText2Image", "prompt", "negativeprompt")
             case _:
                 raise ValueError
+
+
+def __get_port(default_port: int) -> int:
+    port: int = settings.get("im_backend/port")
+    return port if port != -1 else default_port
