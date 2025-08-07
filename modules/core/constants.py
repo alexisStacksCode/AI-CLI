@@ -1,7 +1,97 @@
 from typing import Any
 
 
-VERSION: str = "2.0.0-dev2"
+VERSION: str = "2.0.0-dev"
+TEXT_MODEL_GEN_PARAM_MAP: dict[str, dict[str, str | None]] = {
+    "temperature": {
+        "internal": "temperature",
+        "llama_server": "temperature",
+    },
+    "dynamic_temperature_range": {
+        "internal": None,
+        "llama_server": "dynatemp_range",
+    },
+    "dynamic_temperature_exponent": {
+        "internal": None,
+        "llama_server": "dynatemp_exponent",
+    },
+    "top_k": {
+        "internal": "top_k",
+        "llama_server": "top_k",
+    },
+    "top_p": {
+        "internal": "top_p",
+        "llama_server": "top_p",
+    },
+    "min_p": {
+        "internal": "min_p",
+        "llama_server": "min_p",
+    },
+    "typical_p": {
+        "internal": "typical_p",
+        "llama_server": "typical_p",
+    },
+    "tail_free_sampling": {
+        "internal": "tfs_z",
+        "llama_server": None,
+    },
+    "mirostat_mode": {
+        "internal": "mirostat_mode",
+        "llama_server": "mirostat",
+    },
+    "mirostat_tau": {
+        "internal": "mirostat_tau",
+        "llama_server": "mirostat_tau",
+    },
+    "mirostat_eta": {
+        "internal": "mirostat_eta",
+        "llama_server": "mirostat_eta",
+    },
+    "repetition_penalty": {
+        "internal": "repeat_penalty",
+        "llama_server": "repeat_penalty",
+    },
+    "repetition_penalty_range": {
+        "internal": None,
+        "llama_server": "repeat_last_n",
+    },
+    "presence_penalty": {
+        "internal": "presence_penalty",
+        "llama_server": "presence_penalty",
+    },
+    "frequency_penalty": {
+        "internal": "frequency_penalty",
+        "llama_server": "frequency_penalty",
+    },
+    "dry_base": {
+        "internal": None,
+        "llama_server": "dry_base",
+    },
+    "dry_multiplier": {
+        "internal": None,
+        "llama_server": "dry_multiplier",
+    },
+    "dry_allowed_length": {
+        "internal": None,
+        "llama_server": "dry_allowed_length",
+    },
+    "dry_penalty_range": {
+        "internal": None,
+        "llama_server": "dry_penalty_last_n",
+    },
+    "xtc_threshold": {
+        "internal": None,
+        "llama_server": "xtc_threshold",
+    },
+    "xtc_probability": {
+        "internal": None,
+        "llama_server": "xtc_probability",
+    },
+    "max_tokens": {
+        "internal": "max_tokens",
+        "llama_server": "n_predict",
+    }
+}
 IMAGE_MODEL_GEN_PARAMS_SCHEMA: dict[str, dict[str, Any]] = {
     "posprompt": {
         "type": str,

@@ -10,8 +10,3 @@ class PrintColors(StrEnum):
     SUCCESS = Fore.LIGHTGREEN_EX
     WARNING = Fore.LIGHTYELLOW_EX
     ERROR = Fore.LIGHTRED_EX
-
-
-class ModelResponsePrintBehavior(StrEnum):
-    SSE = "sse"
-    TYPEWRITER = "typewriter"
