@@ -45,24 +45,16 @@ def build_gen_params(include_max_tokens: bool) -> dict[str, Any]:
         return {}
 
     gen_params: dict[str, Any] = {}
-    for n, m in constants.TEXT_MODEL_GEN_PARAM_MAP.items():
-        if n == "max_tokens" and not include_max_tokens:
+    for key, value in constants.TEXT_MODEL_GEN_PARAM_MAP.items():
+        if key == "max_tokens" and not include_max_tokens:
             continue
 
-        if m[shared.text_model_interface.settings_section] is not None:
-            gen_params[m[shared.text_model_interface.settings_section]] = settings.get(f"lm_backend/gen/{n}")  # pyright: ignore[reportArgumentType]
+        real_name: str | None = value[shared.text_model_interface.settings_section]
+
+        if real_name is not None:
+            gen_params[real_name] = settings.get(f"lm_backend/gen/{key}")
     gen_params["stream"] = settings.get("lm_backend/gen/response_stream") in ["sse", "typewriter"]
     return gen_params
-
-
-def refine_message(text: str, keep_thoughts: bool) -> str:
-    if keep_thoughts or ("<think>" not in text and "</think>" not in text):
-        return text
-
-    text_buffer: str = ""
-    for match in re.findall(r"(<think>.*?</think>\n*)(.*?)(?=<think>|$)", text, re.DOTALL):
-        text_buffer += match[1]
-    return text_buffer
 
 
 def __get_port(default_port: int) -> int:
